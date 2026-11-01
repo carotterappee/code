@@ -4,9 +4,11 @@ const allowed=new Set(["^FCHI", "TTE.PA", "SPY", "AAPL", "BZ=F", "GC=F", "XLE", 
 module.exports=async function handler(req,res){
   if(req.method!=='GET')return res.status(405).end();
   const symbol=String(req.query.symbol||'');
-  if(!allowed.has(symbol))return res.status(400).json({error:'Instrument inconnu'});
+  const history = req.query.view === 'history';
+  const crypto = ['BTC-USD','ETH-USD','SOL-USD'].includes(symbol);
+  if(!allowed.has(symbol) && !(history && crypto))return res.status(400).json({error:'Instrument inconnu'});
   const endpoint='https://query1.finance.yahoo.com/v8/finance/chart/'+
-    encodeURIComponent(symbol)+'?interval=1m&range=5d&includePrePost=false';
+    encodeURIComponent(symbol)+(history ? '?interval=1d&period1=0&period2='+Math.ceil(Date.now()/1000)+'&includePrePost=false' : '?interval=1m&range=5d&includePrePost=false');
   try{
     const response=await fetch(endpoint,{
       headers:{Accept:'application/json'},
@@ -25,6 +27,11 @@ module.exports=async function handler(req,res){
         volume:Number.isFinite(quote.volume?.[i])?quote.volume[i]:null});
     }
     if(!rows.length)throw Error('Aucune bougie disponible');
+
+    if(history){
+      res.setHeader('Cache-Control','public, s-maxage=900, stale-while-revalidate=3600');
+      return res.status(200).json({symbol, currency:meta.currency, rows});
+    }
 
     // Avec une plage de cinq jours, chartPreviousClose peut se rapporter
     // au début de la plage. On cherche donc la clôture de la séance précédente.

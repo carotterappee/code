@@ -268,7 +268,7 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 <section><div class="hero"><label id="symbol"></label><strong id="price">—</strong>
 <span class="muted">USD</span><b id="change"></b></div><div id="stats"></div></section>
 <div class="layout"><section><div class="panelhead">PRIX / USD · BOUGIES 1 MIN · VOLUME</div>
-<div id="market-chart-shell"><i id="market-cross" hidden></i><canvas id="chart" aria-label="Chandeliers de prix et volumes échangés par minute"></canvas></div></section>
+<div id="range-tools"></div><div id="market-chart-shell"><i id="market-cross" hidden></i><canvas id="chart" aria-label="Chandeliers de prix et volumes échangés par minute"></canvas></div></section>
 <aside><div class="panelhead">TRANSACTIONS · HEURE DE PARIS</div>
 <table><thead><tr><th>Heure</th><th>Prix USD</th><th>Quantité</th></tr></thead><tbody id="tape"></tbody></table></aside></div>
 <footer><span id="age">En attente des transactions</span><span>Source : Kraken WebSocket v2</span></footer></div>
@@ -308,6 +308,7 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
    <button type="submit">↵</button></form>
 </aside>
 
+<script src="./analyste/labo.js"></script>
 <script src="./analyste/raisonnement.js"></script>
 <script src="./analyste/presidentielle-2027.js"></script>
 <script>
@@ -364,7 +365,7 @@ function connect(){
     }
     if(m.channel==='ticker')ticker={...ticker,...rows[rows.length-1]};
     if(m.channel==='ohlc'){
-      if(m.type==='snapshot')bars.clear();
+      // Minute history and the live feed share timestamp keys.
       for(const r of rows){
         const ts=Date.parse(r.interval_begin);
         if(Number.isFinite(ts))bars.set(ts,r);
@@ -384,10 +385,26 @@ function connect(){
   };
 }
 function selectPair(p){
+  SpectreLab.market(p.replace('/','-'));
   pair=p;ticker={};trades=[];bars.clear();dirty=true;delay=1000;
   $('symbol').textContent=p;
   [...$('pairs').querySelectorAll('button')].forEach(b=>b.setAttribute('aria-pressed',String(b.textContent===p)));
   render();connect();
+  const socket=ws;
+  const restPair=p.replace('BTC','XBT').replace('/','');
+  fetch('https://api.kraken.com/0/public/OHLC?interval=1&pair='+encodeURIComponent(restPair),
+    {signal:AbortSignal.timeout(8000)}).then(r=>r.json()).then(data=>{
+    if(socket!==ws||!active||pair!==p||data.error?.length)return;
+    const rows=Object.entries(data.result||{}).find(([key])=>key!=='last')?.[1];
+    if(!Array.isArray(rows))return;
+    for(const row of rows.slice(-120)){
+      const [time,open,high,low,close,,volume]=row.map(Number);
+      if(![time,open,high,low,close,volume].every(Number.isFinite))continue;
+      const ts=time*1000;
+      if(!bars.has(ts))bars.set(ts,{open,high,low,close,volume});
+    }
+    dirty=true;
+  }).catch(()=>{ /* Live candles continue when the archive is unavailable. */ });
 }
 for(const p of pairs){
   const b=document.createElement('button');b.textContent=p;b.onclick=()=>selectPair(p);
@@ -714,6 +731,7 @@ function openSovereign(visit){
 }
 
 function showMarket(index){
+  if(index) SpectreLab.market(index===sovereignIndex ? null : exchangeInstruments[markets[index][2]][0]);
   const visit=++sovereignVisit;
   if(index===sovereignIndex){openSovereign(visit);return}
   sovereignPanel.hidden=true;
@@ -1129,6 +1147,13 @@ $('la-form').onsubmit=e=>{
   e.preventDefault();
   const q=$('la-question').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(!q)return;
+  if(/prevision|projection|sharpe|drawdown|marge libre|marge requise|niveau de marge|levier|fibonacci|momentum|oscillateur|ecart type|moyenne mobile|vraie plage|pivot|dividende|capitalisation|intrinseque|benefice par action|cours.benefice|facteur de profit|esperance|taux de reussite|gain moyen|perte moyenne|financement|valeur du point/.test(q)
+    && !/presidentiel|candidat|election|programme politique|2027/.test(q)){
+    ++reportVersion;
+    $('la-context').textContent='Laboratoire de marché';
+    SpectreLab.analyst(localOut,markets,exchangeInstruments,currentMarket,q);
+    return;
+  }
   const electionQuestion=/presidentiel|candidat|election|elu en 2027|elue en 2027|programme politique|programme electoral/.test(q)
     || (/\b2027\b/.test(q)&&/bourse|marche|france|programme/.test(q));
   if(electionQuestion){
@@ -1171,5 +1196,6 @@ document.addEventListener('keydown',e=>{
   }
 },true);
 
+SpectreLab.mount();
 selectPair(pair);
 </script></body></html>
