@@ -140,6 +140,129 @@
     }
   }
 
+
+  // Chaque règle relie une mesure précise à un canal économique direct.
+  // Les intitulés sont normalisés par normal(), déjà présent dans le module.
+  const sectorScenarios = {
+    'Énergie': [
+      ['taxe sur les superprofits petroliers|surtaxe sur les benefices petroliers', -1,
+       'Producteurs pétroliers assujettis', 'À bénéfice avant impôt identique, la surtaxe réduit le résultat net.']
+    ],
+    'Électricité et services collectifs': [
+      ['construction de (?:\\w+ ){0,3}(?:reacteurs|epr2)|construire (?:\\w+ ){0,3}(?:reacteurs|epr2)', 1,
+       'Fournisseurs du nucléaire', 'Si les projets sont financés et les contrats attribués, le carnet de commandes des fournisseurs retenus peut augmenter.']
+    ],
+    'Industrie, défense et infrastructures': [
+      ['(?:augmenter|hausse de|augmentation de|hausse du|augmentation du) (?:la |le |du )?(?:budget (?:de la defense|militaire)|depenses militaires)|hausse des depenses militaires', 1,
+       'Industriels de défense', 'Si les crédits supplémentaires financent des équipements, les industriels retenus peuvent recevoir davantage de commandes.'],
+      ['(?:reduire le|baisse du|reduction du) budget (?:de la defense|militaire)', -1,
+       'Industriels de défense', 'Si les économies portent sur les achats de matériel, les commandes domestiques peuvent diminuer.']
+    ],
+    'Banques et assurances': [
+      ['(?:surtaxe|taxe exceptionnelle) sur les (?:superprofits|profits|benefices) (?:des banques|bancaires)', -1,
+       'Banques assujetties', 'À activité identique, le prélèvement réduit le bénéfice disponible après impôt.']
+    ],
+    'Immobilier coté': [
+      ['(?:plafonner|geler|bloquer) les loyers|(?:plafonnement|gel|blocage) des loyers', -1,
+       'Foncières détenant les logements concernés', 'Si le plafond est inférieur au loyer qui aurait été pratiqué, la progression des revenus locatifs ralentit.'],
+      ['(?:relancer|soutenir|subventionner) la construction de logements', 1,
+       'Promoteurs de logements', 'Si le soutien déclenche de nouveaux projets solvables, le volume de programmes vendus peut augmenter.']
+    ],
+    'Consommation, luxe et tourisme': [
+      ['(?:reduire la|baisser la|baisse de la) tva (?:dans|sur) l hotellerie', 1,
+       'Hôteliers exposés en France', 'Une TVA réduite peut soutenir la marge si le prix final reste stable, ou la fréquentation si le prix baisse.']
+    ],
+    'Alimentation et consommation courante': [
+      ['(?:geler|bloquer|plafonner) les prix (?:alimentaires|des produits alimentaires)', -1,
+       'Distributeurs alimentaires concernés', 'Si les coûts augmentent et que les prix de vente sont bloqués sans compensation, la marge se comprime.']
+    ],
+    'Santé et pharmacie': [
+      ['(?:baisser|reduire) (?:le prix|les prix) des medicaments|baisse (?:du prix|des prix) des medicaments', -1,
+       'Laboratoires vendant les médicaments concernés', 'À volume identique, un prix net de vente plus bas réduit le chiffre d’affaires sur ces produits.']
+    ],
+    'Technologies': [
+      ['(?:subventionner|financer) la production de semi conducteurs', 1,
+       'Fabricants de semi-conducteurs éligibles', 'Si l’aide finance une partie des investissements, le coût restant à la charge du fabricant diminue.']
+    ],
+    'Télécommunications': [
+      ['(?:subventionner|financer) le deploiement de la fibre', 1,
+       'Installateurs de fibre', 'Si le financement débouche sur des chantiers supplémentaires, le volume de contrats accessibles augmente.']
+    ],
+    'Matières premières et matériaux': [
+      ['(?:subventionner|soutenir financierement) la (?:production d acier|siderurgie)', 1,
+       'Sidérurgistes éligibles', 'Une aide effectivement versée peut réduire le coût net de production des installations concernées.']
+    ]
+  };
+
+  function scenarioPlot(up, down) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 240 64');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = 'display:block;width:100%;max-width:320px;height:64px;margin:8px 0';
+    function line(d, color, dashed) {
+      const path = document.createElementNS(ns, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width', dashed ? '1' : '3');
+      if (dashed) path.setAttribute('stroke-dasharray', '4 5');
+      svg.append(path);
+    }
+    line('M4 32 H236', '#8292a2', true);
+    if (up) line('M4 32 H45 C105 32 148 19 230 7', '#55edbd');
+    if (down) line('M4 32 H45 C105 32 148 45 230 57', '#ff8399');
+    return svg;
+  }
+
+  function renderSectorOutlook(parent, measures, db) {
+    const section = el('section');
+    parent.append(section);
+    section.append(el('small','SYNTHÈSE / SCÉNARIO SECTORIEL','polit-kicker'),
+      el('h3','Quels secteurs pourraient monter ou baisser ?'),
+      el('p','Lecture des courbes de gauche à droite : situation de référence → effet après application. Leur pente illustre un sens économique possible. Elle ne mesure ni un rendement ni un délai.'));
+
+    const counts = [0, 0, 0, 0];
+    const overview = el('p');
+    section.append(overview);
+    for (const [sector] of branches) {
+      const evidence = [];
+      for (const measure of measures) {
+        // Analyser le titre de la proposition. Le détail peut citer un
+        // scénario adverse, une critique ou un autre programme.
+        const title = normal(measure.title);
+        if (/\b(?:ne|pas|sans|refus|refuser|contre|annuler|abroger|renoncer|supprimer|suppression|fin du|fin de|s opposer)\b/.test(title)) continue;
+        for (const [pattern, sign, group, reason] of sectorScenarios[sector] || []) {
+          if (new RegExp('\\b(?:' + pattern + ')\\b').test(title))
+            evidence.push({measure, sign, group, reason});
+        }
+      }
+      const up = evidence.some(e => e.sign > 0);
+      const down = evidence.some(e => e.sign < 0);
+      const state = up && down ? 2 : up ? 0 : down ? 1 : 3;
+      counts[state]++;
+      const labels = ['↗ Pression haussière', '↘ Pression baissière',
+                      '↗ ↘ Effets opposés', '◇ Indéterminé'];
+      const colors = ['#55edbd', '#ff8399', '#e7c87e', '#a8b5c4'];
+      const card = el('article');
+      card.style.cssText = 'background:#101923;border:1px solid #34424e;border-left:3px solid '+colors[state]+';border-radius:9px;padding:12px 16px;margin:9px 0;color:#e3edf4';
+      const heading = el('strong',sector+' · '+labels[state]);
+      heading.style.color = colors[state];
+      card.append(heading);
+      if (evidence.length) {
+        card.append(scenarioPlot(up,down));
+        for (const e of evidence) {
+          card.append(el('p',(e.sign > 0 ? '↗ ' : '↘ ')+e.group+' — '+e.reason));
+          addMeasure(card,e.measure,db);
+        }
+      } else {
+        card.append(el('p','Les mesures analysées ne permettent pas de déterminer une direction avec les règles disponibles.'));
+      }
+      section.append(card);
+    }
+    overview.textContent = `Sur ${branches.length} secteurs examinés : ${counts[0]} à biais haussier, ${counts[1]} à biais baissier, ${counts[2]} avec effets opposés et ${counts[3]} indéterminés.`;
+  }
+
   function renderProgrammeEntier(parent,c,db){
     parent.replaceChildren();
     const measures=(c.measures||[]).filter(m=>
@@ -235,6 +358,7 @@
     para(parent,'Portée :','Les valeurs préremplies illustrent le calcul. Ce sont des hypothèses modifiables. La pondération complète actuelle du CAC All-Share et la réaction future des cours ne sont pas connues de ce module.');
     safeLink(parent,'Consulter le périmètre du CAC All-Share chez Euronext ↗',
       'https://live.euronext.com/en/product/indices/qs0010989141-xpar');
+    renderSectorOutlook(parent,measures,db);
   }
 
   async function show(out,question,stillCurrent){
