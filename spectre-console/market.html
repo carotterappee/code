@@ -282,6 +282,7 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
    <button type="submit">↵</button></form>
 </aside>
 
+<script src="./analyste/raisonnement.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const pairs=['BTC/USD','ETH/USD','SOL/USD'];
@@ -610,7 +611,9 @@ async function euroSeries(dataset,params){
     .sort(([a],[b])=>a.localeCompare(b)).map(([date,i])=>[date,j.value[i]]));
 }
 
+let ecoSpreads=[];
 function openSovereign(visit){
+  ecoSpreads=[];
   clearTimeout(exchangeTimer);exchangeRequest?.abort();exchangeRequest=null;
   active=false;disconnect();dirty=false;clearHolo();
   currentMarket=sovereignIndex;external.hidden=true;crypto.hidden=true;
@@ -656,6 +659,7 @@ function openSovereign(visit){
     const points=[...fr].filter(([date])=>de.has(date))
       .map(([date,v])=>[date,Math.round((v-de.get(date))*100)]);
     if(!points.length)throw Error('Aucun mois commun');
+    ecoSpreads=points.slice();
     const [date,spread]=points[points.length-1];
     $('sov-spread').textContent=(spread>0?'+':'')+sf(spread)+' pb';
     const explanation=`${date} : France ${sf(fr.get(date))} %, Allemagne ${sf(de.get(date))} %. Un point de base vaut 0,01 point de pourcentage.`;
@@ -1076,11 +1080,37 @@ async function localReport(mode){
 $('la-open').onclick=()=>{localPanel.hidden=false;localReport('resume');$('la-question').focus()};
 $('la-close').onclick=localClose;
 $('la-actions').onclick=e=>{const mode=e.target.dataset.report;if(mode)localReport(mode)};
+
+function analystEcoContext(){
+  const debtLabel=$('sov-ratio')?.textContent||'';
+  const match=debtLabel.match(/([\d\s.,]+)\s*%/);
+  const ratio=match?Number(match[1].replace(/\s/g,'').replace(',','.')):null;
+  const sovereign=currentMarket===sovereignIndex;
+  const symbol=currentMarket&&!sovereign?instrument()[0]:'';
+  let kind='action';
+  if(sovereign)kind='dette';else if(!currentMarket)kind='crypto';
+  else if(symbol.startsWith('^'))kind='indice';else if(symbol.endsWith('=F'))kind='terme';
+  else if(['SPY','XLE','LIT'].includes(symbol))kind='fonds';
+  return {kind,name:localMarket(),debtRatio:ratio,debtLabel,spreads:ecoSpreads,
+    debtNote:[$('sov-rate')?.textContent,$('sov-rate-date')?.textContent,$('sov-rank')?.textContent].filter(Boolean).join(' · '),
+    rows:sovereign?[]:[...bars.entries()].map(([ts,r])=>({ts,close:r.close})),
+    unit:sovereign?'%':currentMarket?instrument()[1]:'USD',
+    status:sovereign?$('sov-status').textContent:$('link').textContent,stamp};
+}
+
 $('la-form').onsubmit=e=>{
   e.preventDefault();
   const q=$('la-question').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(!q)return;
 
+
+  const reasoning=globalThis.SpectreEco?.answer(q,analystEcoContext());
+  if(reasoning){
+    reportVersion++;
+    $('la-context').textContent=localMarket()+' · calcul et lecture du contexte';
+    localOut.textContent=reasoning;
+    return;
+  }
   const archiveIntent=/\b(1602|1929|1987|2007|2008|2009|2022|madoff|ponzi|subprimes?|lehman|ldi|gilts?|voc|krach|kr[a]?ch|crises?|fraudes?|amsterdam|archives?|historiques?|histoire)\b/.test(q)
     || /appel de (marge|garantie)|fonds de pension|lundi noir|assurance de portefeuille|vente[s]? forcee[s]?|pourquoi.*vendai|origine.*bourse|regles? du (jeu|marche)/.test(q);
   if(archiveIntent){archiveShow(q);return}
