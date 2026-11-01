@@ -178,17 +178,135 @@ export function mountBoard(canvas,info){
     info.children[0].textContent=p?p.userData.id+' / '+p.userData.name:'PCB–04';
     info.children[1].textContent=p?p.userData.detail:'Glisse pour tourner · molette pour zoomer';
   }
+
+  const panel=canvas.closest('section');
+  const scope=canvas.parentElement;
+  const style=document.createElement('style');
+  style.textContent=`
+    .pcb-holo-layer {
+      position:absolute;inset:0;z-index:3;overflow:hidden;pointer-events:none;
+      color:#b6ffed;font-family:Consolas,monospace;
+    }
+    .pcb-holo-layer[hidden],section:not(.max) .pcb-holo-layer {display:none}
+    .pcb-holo-layer svg {position:absolute;inset:0;width:100%;height:100%}
+    .pcb-holo-card {
+      position:absolute;box-sizing:border-box;width:min(236px,52%);
+      padding:11px 14px 12px;
+      background:linear-gradient(115deg,rgba(7,35,39,.96),rgba(7,23,30,.89));
+      border:1px solid #559b9b;border-left:2px solid #8cf8e1;
+      box-shadow:inset 0 0 18px #57e8e80a,0 5px 22px #0006;
+      backdrop-filter:blur(5px);
+    }
+    .pcb-holo-card::after {
+      content:"";position:absolute;right:-1px;top:-1px;
+      width:16px;height:5px;background:#93f4df;
+    }
+    .pcb-holo-card small {
+      display:block;color:#8bceca;font-size:9px;letter-spacing:.14em;
+    }
+    .pcb-holo-card strong {
+      display:block;margin:6px 0 5px;color:#d5fff3;
+      font-size:14px;font-weight:600;line-height:1.2;
+    }
+    .pcb-holo-card p {
+      margin:0;color:#bdcfce;font-size:12px;line-height:1.45;
+    }
+    @media(prefers-reduced-motion:no-preference){
+      .pcb-holo-card.pcb-reveal {animation:pcb-readout .16s ease-out}
+      @keyframes pcb-readout {
+        from {opacity:.3;clip-path:inset(0 0 65% 0)}
+        to {opacity:1;clip-path:inset(0)}
+      }
+    }
+  `;
+  document.head.append(style);
+
+  const layer=document.createElement('div');
+  layer.className='pcb-holo-layer';layer.hidden=true;
+  layer.innerHTML=`
+    <svg aria-hidden="true">
+      <polyline fill="none" stroke="#081c21" stroke-width="3.5"/>
+      <polyline fill="none" stroke="#8ff6e2" stroke-width="1.25"/>
+      <circle r="5.5" fill="#0b282b" fill-opacity=".6" stroke="#9bffeb"/>
+      <circle r="1.8" fill="#d0fff3"/>
+    </svg>
+    <div class="pcb-holo-card" role="tooltip">
+      <small></small><strong></strong><p></p>
+    </div>`;
+  scope.append(layer);
+  const card=layer.querySelector('.pcb-holo-card');
+  const wires=layer.querySelectorAll('polyline');
+  const dots=layer.querySelectorAll('circle');
+  let shownPart=null;
+
+  function hideHolo(){
+    layer.hidden=true;
+    shownPart=null;
+  }
+
+  function showHolo(part,point){
+    if(!panel.classList.contains('max') || !part){hideHolo();return}
+    const w=scope.clientWidth,h=scope.clientHeight;
+    const projected=point.clone().project(cam);
+    const x=(projected.x+1)*canvas.clientWidth/2+canvas.offsetLeft;
+    const y=(1-projected.y)*canvas.clientHeight/2+canvas.offsetTop;
+    layer.hidden=false;
+
+    if(shownPart!==part){
+      const {id,name,detail}=part.userData;
+      card.querySelector('small').textContent='PCB–04  /  '+id;
+      card.querySelector('strong').textContent=name;
+      card.querySelector('p').textContent=detail;
+      card.classList.remove('pcb-reveal');
+      void card.offsetWidth;
+      card.classList.add('pcb-reveal');
+      shownPart=part;
+    }
+
+    const cw=card.offsetWidth,ch=card.offsetHeight,pad=10;
+    const right=w-x>=x;
+    const dir=right?1:-1;
+    const gap=Math.max(30,Math.min(98,w*.09));
+    const clamp=(n,min,max)=>Math.max(min,Math.min(n,max));
+    const left=clamp(right?x+gap:x-gap-cw,pad,w-cw-pad);
+    const top=clamp(y-ch*.5+(y<h*.48?32:-32),pad,h-ch-pad);
+    card.style.left=left+'px';card.style.top=top+'px';
+
+    const edge=right?left:left+cw;
+    const endY=top+ch*.5;
+    const bend=edge-dir*Math.min(18,Math.abs(edge-x)*.35);
+    const points=`${x},${y} ${bend},${endY} ${edge},${endY}`;
+    wires.forEach(line=>line.setAttribute('points',points));
+    dots.forEach(dot=>{
+      dot.setAttribute('cx',x);dot.setAttribute('cy',y);
+    });
+  }
+
+  function resetInspection(){hideHolo();select(null)}
+  new MutationObserver(resetInspection).observe(panel,{
+    attributes:true,attributeFilter:['class']
+  });
+  new ResizeObserver(resetInspection).observe(scope);
+  window.addEventListener('blur',resetInspection);
+
   function pick(e){
+    if(!panel.classList.contains('max')){resetInspection();return}
+
     const r=canvas.getBoundingClientRect();
     mouse.set(2*(e.clientX-r.left)/r.width-1,1-2*(e.clientY-r.top)/r.height);
     pickRay.setFromCamera(mouse,cam);
     // Le support opaque bloque le survol des composants cachés derrière lui.
     const hit=pickRay.intersectObjects(board.children,true)[0];
-    select(hit?.object.userData.pcbPart||null);
+
+    const part=hit?.object.userData.pcbPart||null;
+    select(part);
+    if(part)showHolo(part,hit.point);
+    else hideHolo();
   }
   canvas.style.touchAction='none';canvas.style.cursor='grab';
   canvas.onpointerdown=e=>{
     if(!e.isPrimary||e.button!==0)return;
+    resetInspection();
     drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};
     canvas.setPointerCapture(e.pointerId);canvas.style.cursor='grabbing';
   };
@@ -203,15 +321,20 @@ export function mountBoard(canvas,info){
   };
   canvas.onpointerup=e=>{if(drag&&!drag.moved)pick(e);drag=null;canvas.style.cursor='grab'};
   canvas.onlostpointercapture=()=>{drag=null;canvas.style.cursor='grab'};
-  canvas.onpointerleave=e=>{if(!drag&&e.pointerType==='mouse')select(null)};
+  canvas.onpointerleave=e=>{if(!drag&&e.pointerType==='mouse')resetInspection()};
   canvas.addEventListener('wheel',e=>{
-    e.preventDefault();select(null);
+    e.preventDefault();resetInspection();
     distance=Math.max(4.6,Math.min(22,distance*Math.exp(Math.max(-220,Math.min(220,e.deltaY))*.0018)));
   },{passive:false});
   canvas.onkeydown=e=>{
     if(!['ArrowRight','ArrowLeft'].includes(e.key))return;
     e.preventDefault();const i=parts.indexOf(selected);
-    select(parts[(i+(e.key==='ArrowRight'?1:-1)+parts.length)%parts.length]);
+    if(!panel.classList.contains('max')){resetInspection();return}
+    const next=i<0?(e.key==='ArrowRight'?0:parts.length-1):
+      (i+(e.key==='ArrowRight'?1:-1)+parts.length)%parts.length;
+    const part=parts[next];select(part);
+    const center=new T.Box3().setFromObject(part).getCenter(new T.Vector3());
+    showHolo(part,center);
   };
   return function draw(g,w,h){
     const key=[w,h,az,el,distance,selected?.userData.id,devicePixelRatio].join('/');
