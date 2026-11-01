@@ -168,6 +168,26 @@ section.paris-online #nextCam {margin-left:auto}
 #plan {cursor:crosshair;touch-action:manipulation}
 #pcb-info {display:block;padding:7px 10px;line-height:1.45;min-height:3em}
 #pcb-info strong {color:#ffdc91;margin-right:8px}
+</style><style>
+.atom-scope {background:#040a13}
+.atom-scope::after {display:none}
+#atom-view {cursor:grab;touch-action:none}
+#atom-view:active {cursor:grabbing}
+#atom-badge {position:absolute;top:8px;left:10px;pointer-events:none;
+ color:#cbeaff;font:600 12px/1.4 Consolas,monospace;letter-spacing:.07em}
+.atom-controls {display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+ padding:5px 8px;background:#09131b;border-top:1px solid #24404b}
+.atom-controls select,.atom-controls button {color:#bde4ec;background:#101d27;
+ border:1px solid #34515b;font:11px Consolas,monospace;padding:4px 6px}
+#atom-orbitals {display:flex;gap:3px}
+#atom-orbitals [aria-pressed=true] {color:#d0fff6;border-color:#62ccb9;background:#183b3d}
+#atom-play {margin-left:auto}
+#atom-count {font-size:10px;min-height:24px}
+#atom-tip {position:absolute;bottom:12px;left:12px;max-width:min(300px,80%);
+ background:#091925ed;border-left:2px solid #88edda;padding:9px 12px;
+ color:#c5dce5;font:12px/1.45 Consolas,monospace;pointer-events:none}
+#atom-tip strong {display:block;color:#92f2e1;margin-bottom:3px}
+section:not(.max) #atom-tip {display:none}
 </style></head>
 <body>
 <header><b class="mark"></b><strong>SPECTRE</strong><span class="sub">/ OPERATOR CONSOLE</span><time id="clock"></time></header>
@@ -202,10 +222,21 @@ section.paris-online #nextCam {margin-left:auto}
 <div class="meta"><span>ISS / STATION SPATIALE INTERNATIONALE</span><span id="tracking">FREE TRACK</span></div>
   </section>
   <section>
-    <div class="bar"><i>03 /</i> CCTV <button aria-label="Agrandir la caméra">⛶</button></div>
-    <div class="scope"><div id="paris-wall" aria-label="Caméras simulées de Paris"></div></div>
-    <div class="meta"><span id="camName">CAM 01</span>
-<span id="wall-clock"></span><button id="nextCam" aria-label="Caméra suivante">CH +</button></div>
+
+    <div class="bar"><i>03 /</i> ATOM LAB
+      <button aria-label="Agrandir le laboratoire atomique">⛶</button>
+    </div>
+    <div class="scope atom-scope">
+      <canvas id="atom-view" tabindex="0" aria-label="Modèle atomique rotatif"></canvas>
+      <div id="atom-badge"></div>
+      <aside id="atom-tip" hidden><strong></strong><span></span></aside>
+    </div>
+    <div class="atom-controls">
+      <select id="atom-element" aria-label="Élément chimique"></select>
+      <span id="atom-orbitals" role="group" aria-label="Orbitales occupées"></span>
+      <button id="atom-play" type="button" aria-label="Pause ou reprise de la rotation">Ⅱ</button>
+    </div>
+    <div class="meta" id="atom-count"></div>
   </section>
   <section class="blue">
 
@@ -255,41 +286,128 @@ function stream() {
   setTimeout(stream, mode === 'fault' ? 35 : (reduced ? 700 : 250) / speed);
 }
 stream();
-function setCamera(n) {
-  channel = n;
-  updateParisCamera(n);
+
+const atomCanvas=$('atom-view'), atomSelect=$('atom-element');
+const atomPanel=atomCanvas.closest('section'), atomTip=$('atom-tip');
+const elements=[
+  ['H','Hydrogène',1,1,[1]],['He','Hélium',2,4,[2]],
+  ['C','Carbone',6,12,[2,2,2]],['O','Oxygène',8,16,[2,2,4]],
+  ['Ne','Néon',10,20,[2,2,6]],['Si','Silicium',14,28,[2,2,6,2,2]]
+];
+const orbitNames=['1s','2s','2p','3s','3p'];
+elements.forEach(([symbol,name],i)=>atomSelect.add(new Option(symbol+' · '+name,i)));
+let atomIndex=2,orbIndex=2,atomYaw=.52,atomPitch=.22,atomZoom=1;
+let atomRunning=!reduced,atomDrag=null,atomTime=0,atomPrevious=0;
+let atomPoints=[],nucleons=[],atomArea=null,atomSeed=718;
+function atomRand(){
+  atomSeed=(Math.imul(atomSeed,1664525)+1013904223)>>>0;
+  return (atomSeed+.5)/4294967296;
 }
-
-
-const districts=['TOUR EIFFEL','BASTILLE','RÉPUBLIQUE','CONCORDE'];
-const wall=$('paris-wall'), wallPanel=wall.closest('section');
-wallPanel.classList.add('paris-wall-panel');
-const parisTime=new Intl.DateTimeFormat('fr-FR',{
-  timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit',second:'2-digit'
-});
-const feeds=districts.map((name,i)=>{
-  const tile=document.createElement('button');
-  tile.type='button'; tile.className='paris-tile';
-  tile.setAttribute('aria-label','Afficher '+name+' au centre');
-  const canvas=document.createElement('canvas');
-  const tag=document.createElement('span');
-  tag.className='paris-tag';
-  tag.textContent='0'+(i+1)+' / '+name;
-  tile.append(canvas,tag); wall.append(tile);
-  tile.onclick=()=>setCamera(i+1);
-  return {tile,canvas,still:null,w:0,h:0};
-});
-function updateParisCamera(n){
-  const others=feeds.filter((_,i)=>i!==n-1);
-  feeds.forEach(({tile},i)=>{
-    tile.dataset.slot=i===n-1?'main':['left','right','lower'][others.indexOf(feeds[i])];
-    tile.setAttribute('aria-pressed',String(i===n-1));
+function orbitalSample(){
+  // Densités radiales hydrogénoïdes. Pour plusieurs électrons,
+  // la forme reste illustrative et le rayon est ajusté à l’écran.
+  const name=orbitNames[orbIndex],n=Number(name[0]),p=name.endsWith('p');
+  const max=8*n*n,steps=600,cdf=[];
+  let total=0;
+  for(let i=0;i<steps;i++){
+    const r=(i+.5)*max/steps,u=2*r/n;
+    let poly=1;
+    if(name==='2s')poly=2-u;
+    if(name==='3s')poly=3-3*u+u*u/2;
+    if(name==='2p')poly=u;
+    if(name==='3p')poly=u*(4-u);
+    total+=r*r*poly*poly*Math.exp(-u);
+    cdf.push(total);
+  }
+  atomSeed=718+atomIndex*31+orbIndex;
+  atomPoints=[];
+  for(let k=0;k<2700;k++){
+    const target=atomRand()*total;
+    let lo=0,hi=steps-1;
+    while(lo<hi){const mid=(lo+hi)>>1;if(cdf[mid]<target)lo=mid+1;else hi=mid}
+    const radius=(lo+atomRand())*max/steps/(2.2*n*n);
+    const axis=p?Math.cbrt(2*atomRand()-1):2*atomRand()-1;
+    const angle=atomRand()*Math.PI*2,ring=Math.sqrt(1-axis*axis);
+    atomPoints.push([axis*radius,ring*Math.cos(angle)*radius,
+      ring*Math.sin(angle)*radius,atomRand()*6.28,axis>=0]);
+  }
+}
+function setAtom(i){
+  atomIndex=i;atomSelect.value=String(i);atomZoom=1;atomTip.hidden=true;
+  const [symbol,name,Z,A,counts]=elements[i];
+  orbIndex=counts.length-1;
+  $('atom-badge').textContent=symbol+'–'+A+'  /  '+name.toUpperCase();
+  $('atom-count').textContent=Z+' protons  ·  '+(A-Z)+' neutrons  ·  '+Z+' électrons';
+  const controls=$('atom-orbitals');controls.replaceChildren();
+  counts.forEach((count,j)=>{
+    const b=document.createElement('button');
+    b.type='button';b.textContent=orbitNames[j];b.title=count+' électron(s) dans la sous-couche';
+    b.setAttribute('aria-pressed',String(j===orbIndex));
+    b.onclick=()=>{
+      orbIndex=j;atomTip.hidden=true;orbitalSample();
+      [...controls.children].forEach((el,k)=>el.setAttribute('aria-pressed',String(k===j)));
+    };
+    controls.append(b);
   });
-  $('camName').textContent='CAM 0'+n+' / '+districts[n-1];
+  nucleons=[];
+  for(let k=0;k<A;k++){
+    const vertical=1-2*(k+.5)/A,ring=Math.sqrt(1-vertical*vertical),a=k*2.39996;
+    const radius=A===1?0:Math.cbrt(A)*.32;
+    nucleons.push([radius*ring*Math.cos(a),radius*vertical,radius*ring*Math.sin(a),
+      Math.floor((k+1)*Z/A)>Math.floor(k*Z/A)]);
+  }
+  orbitalSample();
 }
-updateParisCamera(channel);
-$('nextCam').onclick=()=>setCamera(channel%4+1);
+function syncAtomPlay(){
+  $('atom-play').textContent=atomRunning?'Ⅱ':'▶';
+  $('atom-play').setAttribute('aria-label',atomRunning?'Mettre en pause':'Reprendre');
+}
+$('atom-play').onclick=()=>{atomRunning=!atomRunning;syncAtomPlay()};
+atomSelect.onchange=()=>setAtom(Number(atomSelect.value));
+setAtom(2);syncAtomPlay();
 
+function atomInspect(e){
+  if(!atomPanel.classList.contains('max')||!atomArea){atomTip.hidden=true;return}
+  const rect=atomCanvas.getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
+  const dx=x-atomArea.cx,dy=y-atomArea.cy,dist=Math.hypot(dx,dy);
+  const [,name,Z,A,counts]=elements[atomIndex];
+  const orbital=orbitNames[orbIndex];
+  let title,detail;
+  if(dist<=atomArea.core){
+    title='NOYAU / '+name.toUpperCase()+'–'+A;
+    detail=Z+' proton(s) de charge positive et '+(A-Z)+' neutron(s). Le noyau est agrandi ici pour être visible.';
+  }else if(atomArea.hits.has(Math.floor(x/14)+','+Math.floor(y/14))){
+    title='ORBITALE / '+orbital;
+    detail=(orbital.endsWith('p')?'Une orientation p est représentée. Ses deux lobes ont des phases opposées.':
+      'Cette orbitale s présente une symétrie sphérique.')+' La sous-couche '+orbital+' contient '+counts[orbIndex]+' électron(s) dans cet atome neutre.';
+  }else{atomTip.hidden=true;return}
+  atomTip.children[0].textContent=title;atomTip.children[1].textContent=detail;
+  atomTip.hidden=false;
+}
+atomCanvas.onpointerdown=e=>{
+  if(!e.isPrimary||e.button!==0)return;
+  atomDrag=[e.clientX,e.clientY];atomCanvas.setPointerCapture(e.pointerId);atomInspect(e);
+};
+atomCanvas.onpointermove=e=>{
+  if(!atomDrag){atomInspect(e);return}
+  atomYaw+=(e.clientX-atomDrag[0])*.009;
+  atomPitch=Math.max(-1.53,Math.min(1.53,atomPitch+(e.clientY-atomDrag[1])*.009));
+  atomTip.hidden=true;atomDrag=[e.clientX,e.clientY];
+};
+atomCanvas.onlostpointercapture=()=>{atomDrag=null};
+atomCanvas.onpointerleave=()=>{atomTip.hidden=true};
+atomCanvas.addEventListener('wheel',e=>{
+  e.preventDefault();atomTip.hidden=true;
+  atomZoom=Math.max(.55,Math.min(2.8,atomZoom*Math.exp(-Math.max(-160,Math.min(160,e.deltaY))*.002)));
+},{passive:false});
+atomCanvas.onkeydown=e=>{
+  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;
+  e.preventDefault();
+  if(e.key==='ArrowLeft')atomYaw-=.12;if(e.key==='ArrowRight')atomYaw+=.12;
+  if(e.key==='ArrowUp')atomPitch=Math.min(1.53,atomPitch+.12);
+  if(e.key==='ArrowDown')atomPitch=Math.max(-1.53,atomPitch-.12);
+};
 function zoom(section) {
   const wasMax = section.classList.contains('max');
   document.querySelector('.max')?.classList.remove('max');
@@ -329,8 +447,12 @@ $('terminal').onsubmit = e => {
   command.value = '';
   if (!s) return;
   let msg;
-  if (s === 'help') msg = 'cam 01–04 · sat lock · sat free · speed 1–5 · clear · virus';
-  else if (/^cam 0?[1-4]$/.test(s)) { setCamera(Number(s.split(' ')[1])); msg = 'CCTV → CAM 0' + channel }
+  if (s === 'help') msg = 'atom H/He/C/O/Ne/Si · sat lock · sat free · speed 1–5 · clear · virus';
+  else if (s.startsWith('atom ')) {
+    const i=elements.findIndex(el=>el[0].toLowerCase()===s.slice(5).trim());
+    if(i>=0){setAtom(i);msg='ATOM LAB → '+elements[i][1]}
+    else msg='Éléments : H, He, C, O, Ne, Si';
+  }
   else if (s === 'sat lock' || s === 'sat free') {
     locked = s === 'sat lock';
     msg = $('tracking').textContent = locked ? 'TARGET LOCKED' : 'FREE TRACK';
@@ -984,235 +1106,49 @@ function globe(g,w,h,t) {
 
 // Le décor est dessiné une fois par format. Seuls les passants,
 // la circulation et le grain sont recalculés pendant la lecture.
-function parisDecor(g,w,h,id){
-  const sky=['#405469','#535467','#4d6074','#5a596c'][id];
-  const horizon=['#b8a091','#c4a394','#b2a7a5','#d1ae93'][id];
-  const skyFade=g.createLinearGradient(0,0,0,h*.69);
-  skyFade.addColorStop(0,sky);skyFade.addColorStop(1,horizon);
-  g.fillStyle=skyFade;g.fillRect(0,0,w,h);
-  function poly(points,color){
-    g.fillStyle=color;g.beginPath();
-    points.forEach(([x,y],i)=>i?g.lineTo(x*w,y*h):g.moveTo(x*w,y*h));
-    g.closePath();g.fill();
-  }
-  function rect(x,y,a,b,c){g.fillStyle=c;g.fillRect(x*w,y*h,a*w,b*h)}
-  function stroke(x,y,X,Y,c,width=1){
-    g.lineWidth=width;line(g,x*w,y*h,X*w,Y*h,c);
-  }
-  function oval(x,y,rx,ry,c){
-    g.fillStyle=c;g.beginPath();g.ellipse(x*w,y*h,rx*w,ry*h,0,0,Math.PI*2);g.fill();
-  }
-  let seed=193+(id+1)*619;
-  function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
 
-  // Une ligne de toits irrégulière, visible entre les premiers plans.
-  for(let i=0;i<46;i++){
-    const x=i/45,top=.48+rnd()*.11;
-    rect(x,top,.03,.68-top,'#595b60');
-    rect(x+.009,top-.018,.004,.02,'#51535a');
+function drawAtom(g,w,h,t){
+  const dt=atomPrevious?Math.min(.15,t-atomPrevious):0;atomPrevious=t;
+  if(atomRunning&&!atomDrag&&atomTip.hidden){atomYaw+=dt*.12;atomTime+=dt}
+  const cx=w*.5,cy=h*.52,R=Math.min(w*.34,h*.39)*atomZoom;
+  const ca=Math.cos(atomYaw),sa=Math.sin(atomYaw),cp=Math.cos(atomPitch),sp=Math.sin(atomPitch);
+  function project(x,y,z){
+    const X=x*ca-z*sa,Z=x*sa+z*ca;
+    return [X,y*cp-Z*sp,y*sp+Z*cp];
   }
-  poly([[0,.64],[1,.64],[1,1],[0,1]],id===2?'#656366':'#424750');
-
-  if(id===0){
-    // Tour Eiffel : pieds incurvés, arche ouverte, deux plateformes et treillis.
-    const iron='#443d3b', cx=.53;
-    function span(y){
-      const t=Math.max(0,(y-.15)/.505);
-      return .003+.105*t*t*t;
-    }
-    for(const side of [-1,1]){
-      const points=[];
-      for(let j=0;j<=25;j++){
-        const y=.15+j*.505/25;
-        points.push([cx+side*span(y),y]);
-      }
-      for(let j=25;j>=0;j--){
-        const y=.15+j*.505/25;
-        points.push([cx+side*(span(y)*.72),y]);
-      }
-      poly(points,iron);
-    }
-    for(let j=0;j<11;j++){
-      const y=.22+j*.030,Y=y+.029;
-      stroke(cx-span(y),y,cx+span(Y),Y,iron);
-      stroke(cx+span(y),y,cx-span(Y),Y,iron);
-    }
-    for(const [y,a] of [[.45,.053],[.55,.115]])rect(cx-a/2,y,a,.009,iron);
-    stroke(cx,.115,cx,.16,iron,1.4);
-    g.strokeStyle=iron;g.lineWidth=Math.max(2,w*.005);g.beginPath();
-    g.moveTo((cx-.074)*w,.646*h);
-    g.bezierCurveTo((cx-.043)*w,.542*h,(cx+.043)*w,.542*h,(cx+.074)*w,.646*h);
-    g.stroke();
-    poly([[0,.70],[.47,.65],[.26,1],[0,1]],'#737173');
-    poly([[1,.70],[.59,.65],[.81,1],[1,1]],'#777271');
-  }else if(id===1){
-    // Colonne de Juillet et silhouette dorée du Génie.
-    rect(.424,.579,.15,.074,'#636567');rect(.449,.545,.10,.035,'#888783');
-    rect(.481,.250,.034,.297,'#456861');rect(.476,.242,.046,.014,'#526f66');
-    rect(.472,.228,.055,.015,'#587569');oval(.498,.224,.023,.009,'#8b8868');
-    stroke(.499,.219,.501,.183,'#d6b574',Math.max(2,w*.006));
-    oval(.503,.177,.006,.009,'#dabb79');
-    poly([[.50,.197],[.476,.174],[.482,.201],[.50,.208]],'#c6a267');
-    poly([[.502,.191],[.519,.158],[.519,.182]],'#daba77');
-    oval(.5,.677,.19,.022,'#777977');
-  }else if(id===2){
-    // Monument de la République et dallage du parvis.
-    for(let j=0;j<7;j++)stroke(0,.67+j*j*.008,1,.67+j*j*.008,'#59595b');
-    for(let j=-6;j<=6;j++)stroke(.49+j*.045,.65,.49+j*.22,1,'#59595b');
-    rect(.40,.60,.20,.057,'#767675');rect(.434,.50,.132,.105,'#8c8985');
-    rect(.421,.49,.157,.019,'#9b958a');
-    poly([[.47,.491],[.49,.376],[.514,.368],[.54,.491]],'#424d4c');
-    oval(.504,.354,.014,.019,'#48534e');
-    stroke(.507,.39,.54,.333,'#49564c',Math.max(2,w*.009));
-    stroke(.54,.333,.554,.302,'#576b54',2);
-  }else{
-    // Obélisque, pointe dorée et socle clair.
-    rect(.432,.605,.133,.059,'#89827b');rect(.455,.552,.09,.056,'#a2998b');
-    poly([[.478,.552],[.489,.221],[.511,.221],[.523,.552]],'#c6ad87');
-    poly([[.501,.552],[.501,.221],[.511,.221],[.523,.552]],'#a48b70');
-    poly([[.489,.221],[.501,.167],[.511,.221]],'#d8b46e');
-    for(let j=0;j<12;j++)rect(.493,.25+j*.023,.008,.004,'#a18f78');
+  const glow=g.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,Math.min(w,h)*.7));
+  glow.addColorStop(0,'#12273b');glow.addColorStop(.65,'#071321');glow.addColorStop(1,'#040a12');
+  g.fillStyle=glow;g.fillRect(0,0,w,h);
+  const big=atomPanel.classList.contains('max'),hitCells=new Set();
+  const dots=big?atomPoints.length:1000;
+  const isP=orbitNames[orbIndex].endsWith('p');
+  const size=big?1.7:1.1;
+  for(let k=0;k<dots;k++){
+    const [x,y,z,phase,positive]=atomPoints[k],[X,Y,Z]=project(x,y,z);
+    const px=cx+R*X,py=cy-R*Y;
+    if(px<0||px>w||py<0||py>h)continue;
+    g.globalAlpha=Math.max(.12,Math.min(.92,.42+Z*.17+.12*Math.sin(atomTime*1.4+phase)));
+    g.fillStyle=isP&&!positive?'#bd9bff':'#69e8e1';
+    g.fillRect(px,py,size,size);
+    if(big)hitCells.add(Math.floor(px/14)+','+Math.floor(py/14));
   }
-
-  // Façades latérales en perspective : mansardes, cheminées, fenêtres et balcons.
-  for(const side of [-1,1]){
-    const flip=x=>side===-1?x:1-x;
-    for(let j=5;j>=0;j--){
-      const d=(6-j)/6,edge=.39*(1-d),bw=.074;
-      const top=.46-d*(id===0?.35:.17)+rnd()*.025;
-      const base=.64+d*.15;
-      const a=flip(edge),b=flip(edge+bw);
-      poly([[a,top],[b,top+.024],[b,base-.018],[a,base]],['#88817d','#79777a','#91877f'][j%3]);
-      poly([[a,top],[b,top+.024],[b,top-.002],[flip(edge+.014),top-.042]],'#444d59');
-      rect(flip(edge+.035),top-.053,.005,.033,'#4e4e53');
-      for(let row=0;row<5;row++)for(let col=0;col<3;col++){
-        const x=flip(edge+.009+col*.021),y=top+.045+row*(base-top-.065)/5+col*.005;
-        rect(x,y,.008,.017+d*.008,rnd()>.68?'#d7b887':'#4b5055');
-      }
-      stroke(a,base-.08,b,base-.095,'#565454');
-    }
+  g.globalAlpha=1;
+  const unit=Math.max(3,Math.min(w,h)*.029*atomZoom);
+  const balls=nucleons.map(([x,y,z,p])=>[...project(x,y,z),p]).sort((a,b)=>a[2]-b[2]);
+  for(const [x,y,z,proton] of balls){
+    const X=cx+x*unit,Y=cy-y*unit,r=unit*.55;
+    const light=g.createRadialGradient(X-r*.35,Y-r*.4,0,X,Y,r);
+    light.addColorStop(0,proton?'#ffe1bb':'#d9edff');
+    light.addColorStop(.45,proton?'#ef885e':'#80abc7');
+    light.addColorStop(1,proton?'#793c38':'#35485f');
+    g.fillStyle=light;g.beginPath();g.arc(X,Y,r,0,Math.PI*2);g.fill();
   }
-  for(const side of [-1,1])for(let j=0;j<5;j++){
-    const d=(j+1)/5,x=.5+side*(.14+.29*d),y=.65+.17*d;
-    stroke(x,y,x,y-.12*d,'#303a40',1+d);
-    oval(x,y-.12*d,.003+d*.003,.004+d*.004,'#ffe0a4');
+  atomArea={cx,cy,core:unit*(.60+Math.cbrt(balls.length)*.32),hits:hitCells};
+  if(big){
+    g.fillStyle='#86a9b5';g.font='11px Consolas,monospace';
+    g.fillText('DENSITÉ DE PROBABILITÉ  /  '+orbitNames[orbIndex].toUpperCase(),12,h-13);
   }
-  const shade=g.createLinearGradient(0,h*.60,0,h);
-  shade.addColorStop(0,'#07132200');shade.addColorStop(1,'#101a294a');
-  g.fillStyle=shade;g.fillRect(0,h*.6,w,h*.4);
 }
-
-function parisMotion(g,w,h,id,t){
-  if(id!==2){
-    for(let k=0;k<8;k++){
-      const lane=k%2;
-      const u=(t*(.032+id*.003)+k*.137+id*.21)%1;
-      let p=lane?1-u:u;
-      const d=.10+.90*p*p;
-      let x=.53+(lane?-.26:.21)*d,y=.665+.34*d;
-      if(id===1||id===3){x=u*1.18-.09;y=.73+lane*.065; p=.46+lane*.14}
-      const a=w*(.014+.054*p),b=h*(.007+.025*p);
-      g.fillStyle=lane?'#39434e':'#303943';g.fillRect(x*w-a/2,y*h-b,a,b);
-      g.fillRect(x*w-a*.30,y*h-b*1.45,a*.56,b*.55);
-      g.fillStyle=lane?'#e57863':'#f8daad';
-      for(const side of [-1,1])g.fillRect(x*w+side*a*.34,y*h-b*.56,Math.max(1,a*.14),Math.max(1,b*.24));
-    }
-  }
-  const count=id===2?17:5;
-  for(let k=0;k<count;k++){
-    const dir=k%2?1:-1,u=(k*.167+t*(.008+(k%4)*.002))%1;
-    const x=(dir===1?u:1-u)*w,y=(.695+(k%4)*.047)*h;
-    const size=h*(.020+(k%4)*.006);
-    g.fillStyle=['#313b40','#474149','#575051'][k%3];
-    g.beginPath();g.arc(x,y-size*.85,size*.13,0,Math.PI*2);g.fill();
-    g.fillRect(x-size*.15,y-size*.73,size*.30,size*.48);
-    const step=Math.sin(t*4+k)*size*.17;
-    g.lineWidth=Math.max(1,size*.095);
-    line(g,x,y-size*.3,x+step,y,'#36383d');line(g,x,y-size*.3,x-step,y,'#36383d');
-  }
-  const tick=Math.floor(t*10);
-  g.fillStyle='#e1ead812';
-  for(let k=0;k<44;k++)g.fillRect(((k*137+tick*17)%997)/997*w,((k*271+tick*31)%991)/991*h,1.4,1);
-}
-
-let lastWallFrame=-1,wallSecond=-1;
-
-const parisAtlas = new Image();
-parisAtlas.src = './paris-cameras.png';
-parisAtlas.addEventListener('error', () => {
-  console.warn('SPECTRE : image paris-cameras.png illisible ou introuvable.');
-});
-
-// Point d’intérêt horizontal : il garde chaque monument dans le cadre
-// quand une caméra passe du grand écran à une étroite fenêtre latérale.
-const parisAnchor = [.62,.50,.51,.55];
-
-function drawParisWall(t){
-  if(t-lastWallFrame<.10)return;
-  lastWallFrame=t;
-  const second=Math.floor(t);
-  if(second!==wallSecond){
-    wallSecond=second;
-    $('wall-clock').textContent=parisTime.format(new Date())+' PARIS';
-  }
-
-  feeds.forEach((feed,id)=>{
-    const {tile,canvas}=feed;
-    const w=tile.clientWidth,h=tile.clientHeight;
-    if(!w||!h)return;
-
-    const d=Math.min(devicePixelRatio||1,1.5);
-    const W=Math.round(w*d),H=Math.round(h*d);
-    const loaded=parisAtlas.complete && parisAtlas.naturalWidth>0;
-    if(!feed.still || feed.w!==W || feed.h!==H || feed.photoReady!==loaded){
-      feed.w=W;feed.h=H;feed.photoReady=loaded;
-      canvas.width=W;canvas.height=H;
-      feed.still=document.createElement('canvas');
-      feed.still.width=W;feed.still.height=H;
-      const bg=feed.still.getContext('2d');
-
-      if(loaded){
-        const qw=Math.floor(parisAtlas.naturalWidth/2);
-        const qh=Math.floor(parisAtlas.naturalHeight/2);
-        const x0=(id%2)*qw+1,y0=Math.floor(id/2)*qh+1;
-        const sw=qw-2,sh=qh-2;
-        const scale=Math.max(W/sw,H/sh);
-        const cw=W/scale,ch=H/scale;
-        const offsetX=Math.max(0,Math.min(sw-cw,sw*parisAnchor[id]-cw/2));
-        // En format panoramique, on préserve le haut des monuments.
-        const offsetY=(sh-ch)*.18;
-        bg.imageSmoothingQuality='high';
-        bg.drawImage(parisAtlas,x0+offsetX,y0+offsetY,cw,ch,0,0,W,H);
-      }else{
-        bg.scale(d,d);
-        parisDecor(bg,w,h,id);
-      }
-    }
-
-    const g=canvas.getContext('2d');
-    g.setTransform(1,0,0,1,0,0);
-    g.drawImage(feed.still,0,0);
-    if(!loaded){
-      g.save();g.scale(d,d);
-      parisMotion(g,w,h,id,reduced?0:t);
-      g.restore();
-      return;
-    }
-
-    // Un grain très fin. Le cadrage reste fixe, comme sur une caméra murale.
-    if(!reduced){
-      const tick=Math.floor(t*10);
-      g.fillStyle='rgba(220,230,238,.085)';
-      for(let j=0;j<90;j++){
-        const x=((j*193+tick*71+id*37)%997)/997*W;
-        const y=((j*277+tick*43)%991)/991*H;
-        g.fillRect(x,y,1,1);
-      }
-    }
-  });
-}
-
-
 const pcbCanvas=$('plan'), pcbInfo=$('pcb-info');
 const pcbParts=[
   ['U1','Microcontrôleur','Exécute le programme de la carte. Il lit les capteurs et pilote les sorties.',105,66,50,43,'chip'],
@@ -1342,13 +1278,13 @@ function startSpectrePCB(){
 }
 startSpectrePCB();
 
-const screens=[[$('orbit'),globe],[$('plan'),floorPlan]];
+const screens=[[$('orbit'),globe],[atomCanvas,drawAtom],[$('plan'),floorPlan]];
 let last=0;
 function render(ms) {
   requestAnimationFrame(render);
   if(mode==='black' || ms-last<(reduced?120:40)) return;
   last=ms;
-  drawParisWall(ms/1000);
+
   for(const [canvas,draw] of screens) {
     const w=canvas.clientWidth,h=canvas.clientHeight,d=Math.min(devicePixelRatio||1,2);
     if(!w||!h) continue;
@@ -1864,7 +1800,7 @@ requestAnimationFrame(render);
     shock.replaceChildren(boot);
     shock.hidden=false;
     const log=(ms,text)=>after(ms,()=>{boot.textContent+='\n'+text});
-    log(200,'[ 12% ] restoring CCTV ........ OK');
+    log(200,'[ 12% ] restoring ATOM ........ OK');
     log(570,'[ 46% ] restoring ORBIT ....... OK');
     log(940,'[ 78% ] restoring FLOOR PLAN .. OK');
     log(1370,'[ 99% ] restarting shell ......');
@@ -1937,9 +1873,7 @@ requestAnimationFrame(render);
 
     const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
     const panels=[
-      ['CCTV / PARIS',capturePanel(
-        document.querySelector('#paris-wall [data-slot="main"] canvas') ||
-        document.getElementById('camera'))],
+      ['ATOM LAB',capturePanel(document.getElementById('atom-view'))],
       ['ORBITAL TRACKER',capturePanel(document.getElementById('orbit'))],
       ['PCB / SENSOR BOARD',capturePanel(document.getElementById('plan'))],
       ['KERNEL / TRACE',''],['MEMORY / DUMP',''],['SPECTRE / SHELL','']
