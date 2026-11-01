@@ -283,6 +283,7 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 </aside>
 
 <script src="./analyste/raisonnement.js"></script>
+<script src="./analyste/presidentielle-2027.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const pairs=['BTC/USD','ETH/USD','SOL/USD'];
@@ -1102,6 +1103,15 @@ $('la-form').onsubmit=e=>{
   e.preventDefault();
   const q=$('la-question').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(!q)return;
+  const electionQuestion=/presidentiel|candidat|election|elu en 2027|elue en 2027|programme politique|programme electoral/.test(q)
+    || (/\b2027\b/.test(q)&&/bourse|marche|france|programme/.test(q));
+  if(electionQuestion){
+    const visit=++reportVersion;
+    $('la-context').textContent='France / Présidentielle 2027 · scénarios';
+    SpectreElection.show(localOut,q,()=>visit===reportVersion);
+    return;
+  }
+
 
 
   const reasoning=globalThis.SpectreEco?.answer(q,analystEcoContext());
@@ -1111,6 +1121,7 @@ $('la-form').onsubmit=e=>{
     localOut.textContent=reasoning;
     return;
   }
+
   const archiveIntent=/\b(1602|1929|1987|2007|2008|2009|2022|madoff|ponzi|subprimes?|lehman|ldi|gilts?|voc|krach|kr[a]?ch|crises?|fraudes?|amsterdam|archives?|historiques?|histoire)\b/.test(q)
     || /appel de (marge|garantie)|fonds de pension|lundi noir|assurance de portefeuille|vente[s]? forcee[s]?|pourquoi.*vendai|origine.*bourse|regles? du (jeu|marche)/.test(q);
   if(archiveIntent){archiveShow(q);return}
