@@ -164,20 +164,10 @@ section.paris-online #nextCam {margin-left:auto}
 }
 </style>
 <style>
-#plan {touch-action:none;cursor:grab}
-#plan:active {cursor:grabbing}
-#nancy-tools {position:absolute;right:8px;top:8px;z-index:2;display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
-#nancy-tools button,#nancy-tools select,#nancy-legend button {
-  color:#cadbd4;background:#0a1815ed;border:1px solid #39564a;
-  padding:5px 7px;font:10px Consolas,monospace;letter-spacing:.045em
-}
-#nancy-scan[aria-pressed="true"] {color:#abf6ff;border-color:#5fa6ac}
-#nancy-legend {position:absolute;bottom:7px;left:7px;right:7px;z-index:2;
-  display:flex;flex-wrap:wrap;gap:4px}
-#nancy-legend[hidden],#nancy-level[hidden] {display:none}
-#nancy-legend button[aria-pressed="true"] {border-color:currentColor;background:#19312c}
 .blue .scope::after {display:none}
-.blue:not(.max) #nancy-tools select,.blue:not(.max) #nancy-legend {display:none}
+#plan {cursor:crosshair;touch-action:manipulation}
+#pcb-info {display:block;padding:7px 10px;line-height:1.45;min-height:3em}
+#pcb-info strong {color:#ffdc91;margin-right:8px}
 </style></head>
 <body>
 <header><b class="mark"></b><strong>SPECTRE</strong><span class="sub">/ OPERATOR CONSOLE</span><time id="clock"></time></header>
@@ -218,15 +208,16 @@ section.paris-online #nextCam {margin-left:auto}
 <span id="wall-clock"></span><button id="nextCam" aria-label="Caméra suivante">CH +</button></div>
   </section>
   <section class="blue">
-    <div class="bar"><i>04 /</i> FLOOR PLAN <button aria-label="Agrandir le plan">⛶</button></div>
-    <div class="scope"><canvas id="plan" aria-label="Maquette 3D du 3 rue de Nancy"></canvas>
-<div id="nancy-tools">
-  <button type="button" id="nancy-scan" aria-pressed="false">⌖ SCAN</button>
-  <select id="nancy-level" aria-label="Étage à examiner" hidden>
-    <option value="-1">TOUS LES NIVEAUX</option>
-  </select>
-</div></div>
-    <div class="meta"><span>3 RUE DE NANCY · PARIS 10ᵉ</span><span>H. MOY. ≈ 18 M</span></div>
+
+    <div class="bar"><i>04 /</i> PCB · SENSOR BOARD
+      <button aria-label="Agrandir la carte électronique">⛶</button>
+    </div>
+    <div class="scope">
+      <canvas id="plan" tabindex="0" aria-label="Carte électronique interactive"></canvas>
+    </div>
+    <div class="meta" id="pcb-info" aria-live="polite">
+      <strong>PCB–04</strong><span>Survole un composant.</span>
+    </div>
   </section>
 </main>
 <footer><span>● LOCAL LINK</span><span id="packets"></span></footer>
@@ -1221,418 +1212,123 @@ function drawParisWall(t){
   });
 }
 
-const nancyCanvas=$('plan'), scanCtl=$('nancy-scan'), levelCtl=$('nancy-level');
-const legend=document.createElement('div');
-legend.id='nancy-legend'; legend.hidden=true;
-nancyCanvas.parentElement.append(legend);
-const pipes=[
-  {name:'EAU',color:'#62c8ff',x:-3.5,z:-1.8},
-  {name:'ÉVACUATION',color:'#79cfa1',x:-2.5,z:-1.2},
-  {name:'GAZ',color:'#f7c559',x:-.9,z:1.7},
-  {name:'ÉLECTRICITÉ',color:'#ec8cdb',x:1.3,z:1.3},
-  {name:'VENTILATION',color:'#a7b9ce',x:3.2,z:-1.2}
+
+const pcbCanvas=$('plan'), pcbInfo=$('pcb-info');
+const pcbParts=[
+  ['U1','Microcontrôleur','Exécute le programme de la carte. Il lit les capteurs et pilote les sorties.',105,66,50,43,'chip'],
+  ['U2','Magnétomètre','Mesure le champ magnétique selon trois axes. On peut notamment l’utiliser dans une boussole électronique.',209,33,27,25,'chip'],
+  ['U3','Capteur de température','Transforme la température mesurée en une valeur que le microcontrôleur peut lire.',207,106,27,21,'chip'],
+  ['L1','Bobine','Le courant qui parcourt cet enroulement crée un champ magnétique dans lequel de l’énergie est stockée.',52,35,31,34,'coil'],
+  ['C1','Condensateur','Stocke des charges électriques. Sur une alimentation, il aide à limiter les variations rapides de tension.',27,89,23,23,'cap'],
+  ['J1','Bornier à vis','Les vis serrent les fils pour relier l’alimentation extérieure aux pistes de la carte.',12,25,25,40,'port'],
+  ['D1','LED témoin','Cette diode émet de la lumière quand un courant la traverse dans le sens passant.',164,29,15,10,'led'],
+  ['R1','Résistance','Placée en série avec la LED, elle limite le courant qui la traverse.',162,50,19,10,'res'],
+  ['J2','Connecteur de signaux','Ces broches relient la carte à des modules extérieurs pour échanger des signaux électriques.',106,130,60,13,'pins']
 ];
-const levelName=i=>i===0?'RDC':'ÉTAGE '+i;
-for(let i=0;i<7;i++)levelCtl.add(new Option(levelName(i),i));
-let az=-.39,tilt=.30,scan=false,amount=0,network=-1,level=-1,grab=null,lastTime=0;
-function pickNet(i){
-  network=i;
-  [...legend.children].forEach((b,j)=>b.setAttribute('aria-pressed',String(j===i+1)));
+let pcbSelected=-1, pcbView=null;
+function pcbSelect(i){
+  if(i===pcbSelected)return;
+  pcbSelected=i;
+  const p=pcbParts[i];
+  pcbInfo.children[0].textContent=p?p[0]+' / '+p[1]:'PCB–04';
+  pcbInfo.children[1].textContent=p?p[2]:'Survole un composant.';
 }
-['TOUS',...pipes.map(p=>p.name)].forEach((name,j)=>{
-  const b=document.createElement('button');b.type='button';b.textContent=name;
-  if(j)b.style.color=pipes[j-1].color;
-  b.onclick=()=>pickNet(j-1);legend.append(b);
-});
-pickNet(-1);
-scanCtl.onclick=()=>{
-  scan=!scan;
-  scanCtl.textContent=scan?'↥ FAÇADE':'⌖ SCAN';
-  scanCtl.setAttribute('aria-pressed',String(scan));
-  levelCtl.hidden=legend.hidden=!scan;
-  if(!scan){level=-1;levelCtl.value='-1';pickNet(-1)}
+function pcbHit(e){
+  if(!pcbView)return;
+  const r=pcbCanvas.getBoundingClientRect();
+  const x=(e.clientX-r.left-pcbView.x)/pcbView.scale;
+  const y=(e.clientY-r.top-pcbView.y)/pcbView.scale;
+  pcbSelect(pcbParts.findIndex(p=>x>=p[3]-3 && x<=p[3]+p[5]+3 &&
+                                  y>=p[4]-3 && y<=p[4]+p[6]+3));
+}
+pcbCanvas.onpointermove=pcbHit;
+pcbCanvas.onpointerdown=pcbHit;
+pcbCanvas.onpointerleave=e=>{if(e.pointerType==='mouse')pcbSelect(-1)};
+pcbCanvas.onkeydown=e=>{
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+  e.preventDefault();
+  const n=pcbParts.length;
+  pcbSelect(pcbSelected<0?(e.key==='ArrowRight'?0:n-1):
+    (pcbSelected+(e.key==='ArrowRight'?1:-1)+n)%n);
 };
-levelCtl.onchange=()=>{level=Number(levelCtl.value)};
-nancyCanvas.onpointerdown=e=>{
-  if(!e.isPrimary||e.button!==0)return;
-  grab=[e.clientX,e.clientY];nancyCanvas.setPointerCapture(e.pointerId);
-};
-nancyCanvas.onpointermove=e=>{
-  if(!grab)return;
-  az+=(e.clientX-grab[0])*.009;
-  tilt=Math.max(.05,Math.min(1.4,tilt+(e.clientY-grab[1])*.008));
-  grab=[e.clientX,e.clientY];
-};
-nancyCanvas.onlostpointercapture=()=>{grab=null};
-
-// Géométrie de présentation, en mètres de maquette.
-const outer=[],inside=[];
-function face3(list,points,fill,edge,layer=-1,net=-1){
-  list.push({points,fill,edge,layer,net});
-}
-function box3(list,x,y,z,w,h,d,palette,edge,layer=-1,net=-1){
-  const v=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
-           [-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]
-    .map(([a,b,c])=>[x+a*w/2,y+b*h/2,z+c*d/2]);
-  const faces=[[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]];
-  faces.forEach((f,i)=>face3(list,f.map(k=>v[k]),palette[i%palette.length],edge,layer,net));
-}
-const height=18, width=13, depth=9, storey=height/7;
-const stone=['#a29987','#c7beac','#9b9386','#b4aa99','#d7cebc','#807a71'];
-box3(outer,0,9,0,width,height,depth,stone,'#716e66');
-for(let f=0;f<7;f++){
-  const y=f*storey;
-  // Fenêtres sur rue et sur cour.
-  for(const side of [-1,1])for(let col=0;col<5;col++){
-    const x=(col-2)*2.42,z=side*(depth/2+.035);
-    const door=f===0&&col===2&&side===1;
-    const low=y+(door?.02:.52),high=y+2.18,r=door?.76:.61;
-    const quad=(l,b,rr,t,Z,fill)=>face3(outer,[[l,b,Z],[rr,b,Z],[rr,t,Z],[l,t,Z]],fill,'');
-    quad(x-r-.10,low-.09,x+r+.10,high+.11,z,'#ded3bd');
-    quad(x-r,low,x+r,high,z+side*.018,door?'#454f4a':
-      ((col+f*3+(side+1))%7===0?'#cbbb91':'#4e6064'));
-    quad(x-.026,low,x+.026,high,z+side*.033,'#a69e8a');
-    quad(x-r,high-.51,x+r,high-.46,z+side*.033,'#a69e8a');
-    if(f>0&&side===1){
-      quad(x-r-.05,low+.39,x+r+.05,low+.44,z+side*.065,'#454a47');
-      for(let k=-2;k<=2;k++)quad(x+k*.23-.018,low,x+k*.23+.018,low+.41,z+side*.065,'#454a47');
-    }
-  }
-  if(f===2||f===5||f===6)box3(outer,0,y-.08,0,width+.28,.15,depth+.27,stone,'');
-  // Dans la coupe : dalle, palier et cloisons basses pour voir les branches.
-  box3(inside,0,y,0,width,.11,depth,['#263832','#344a41'],'#698277',f);
-  for(const x of [-2.2,2.2])
-    box3(inside,x,y+.29,-1.55,.10,.56,5.5,['#52655c'],'#677c71',f);
-  box3(inside,0,y+.29,1.1,4.4,.56,.10,['#52655c'],'#677c71',f);
-}
-box3(outer,0,18,0,width+.45,.25,depth+.4,stone,'');
-for(const side of [-1,1]){
-  face3(outer,[[-6.7,18,side*4.7],[6.7,18,side*4.7],[5.85,19.8,side*3.1],[-5.85,19.8,side*3.1]],'#59656b','#788086');
-  face3(outer,[[side*6.7,18,-4.7],[side*6.7,18,4.7],[side*5.85,19.8,3.1],[side*5.85,19.8,-3.1]],'#505b62','#727a80');
-}
-box3(outer,0,19.80,0,11.7,.08,6.2,['#788186'],'');
-for(const x of [-4.8,4.7])box3(outer,x,20.15,-1.8,.78,1.05,.66,['#9a796b','#b19380'],'#776d62');
-
-function route(points,net,f){
-  for(let j=1;j<points.length;j++){
-    const a=points[j-1],b=points[j];
-    const t=[.11,.20,.09,.12,.30][net],c=pipes[net].color;
-    box3(inside,(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2,
-      Math.abs(a[0]-b[0])+t,Math.abs(a[1]-b[1])+t,Math.abs(a[2]-b[2])+t,
-      [c],net===4?'#778896':'',f,net);
-  }
-}
-for(let f=0;f<7;f++)pipes.forEach(({x,z},n)=>{
-  const base=f*storey;
-  const y=base+[.53,.30,1.08,1.76,2.06][n];
-  route([[x,base,z],[x,base+storey,z]],n,f);
-  const endX=n<2?-5.2:5.2;
-  const endZ=[-3.3,-3.3,3.3,3.5,-3.2][n];
-  route([[x,y,z],[endX,y,z],[endX,y,endZ]],n,f);
-  if(n===4)box3(inside,endX,y,endZ,.66,.24,.48,['#b6c4ce'],'#70818b',f,n);
-});
-
-
-// Rendu en profondeur sur un canvas séparé. Le panneau SPECTRE
-// conserve son canvas 2D pour le rideau de scan et les légendes.
-const nancyGLCanvas=document.createElement('canvas');
-const nancyGL=nancyGLCanvas.getContext('webgl',{
-  alpha:true,antialias:true,premultipliedAlpha:true,preserveDrawingBuffer:true
-});
-let nancyGpu=null;
-function nancyVolumeView(gl){
-  if(!gl)return null;
-  const vertex=`
-    attribute vec3 pos;
-    attribute vec3 tint;
-    uniform vec2 viewport;
-    uniform vec4 rotation;
-    uniform vec3 layout;
-    varying vec3 color;
-    void main(){
-      float X=pos.x*rotation.x+pos.z*rotation.y;
-      float Z=pos.z*rotation.x-pos.x*rotation.y;
-      float Y=pos.y-layout.y;
-      float height=Y*rotation.z-Z*rotation.w;
-      float depth=Z*rotation.z+Y*rotation.w;
-      gl_Position=vec4(2.0*X*layout.x/viewport.x,
-        1.0-2.0*layout.z+2.0*height*layout.x/viewport.y,-depth/55.0,1.0);
-      color=tint;
-    }`;
-  const fragment=`
-    precision mediump float;
-    varying vec3 color;
-    void main(){gl_FragColor=vec4(color,1.0);}
-  `;
-  function compile(type,src){
-    const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
-    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));
-    return s;
-  }
-  const program=gl.createProgram();
-  gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));
-  gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));
-  gl.linkProgram(program);
-  if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error('Nancy: liaison WebGL');
-  gl.useProgram(program);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);
-  const pos=gl.getAttribLocation(program,'pos'),tint=gl.getAttribLocation(program,'tint');
-  gl.enableVertexAttribArray(pos);gl.enableVertexAttribArray(tint);
-  const uniforms=Object.fromEntries(['viewport','rotation','layout'].map(k=>[k,gl.getUniformLocation(program,k)]));
-  const palette=new Map();
-  function rgb(hex){
-    if(!palette.has(hex)){
-      const n=parseInt(hex.slice(1),16);
-      palette.set(hex,[(n>>16)/255,((n>>8)&255)/255,(n&255)/255]);
-    }
-    return palette.get(hex);
-  }
-  function upload(faces){
-    const data=[];
-    for(const f of faces){
-      const p=f.points,c=rgb(f.fill);
-      for(let i=1;i<p.length-1;i++)
-        for(const v of [p[0],p[i],p[i+1]])data.push(...v,...c);
-    }
-    const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
-    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
-    return {buf,count:data.length/6};
-  }
-  function draw(mesh){
-    gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buf);
-    gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0);
-    gl.vertexAttribPointer(tint,3,gl.FLOAT,false,24,12);
-    gl.drawArrays(gl.TRIANGLES,0,mesh.count);
-  }
-  return {uniforms,upload,draw};
-}
-
-// Palette de six faces : rue, cour, flancs, dessus et dessous.
-function finish(front,side,top){
-  return [side,front,side,front,top,side];
-}
-const limestone=finish('#c6bba5','#aba08c','#e4dac4');
-const ledge=finish('#ded4bf','#aa9f8c','#eee4d0');
-const ironwork=finish('#373d3b','#262d2d','#68706b');
-const wood=finish('#906a4c','#664b36','#b18b66');
-const plaster=finish('#d1c8b7','#a99f8f','#e7dfcf');
-const porcelain=finish('#d9dfd9','#a1ada7','#f1f0e5');
-const oak=finish('#ab815a','#856448','#c19a72');
-const slate=finish('#53636c','#414e55','#718087');
-const richerOuter=outer.slice();
-const furnishings=[];
-function ext(x,y,z,a,b,c,p){box3(richerOuter,x,y,z,a,b,c,p,'')}
-function interior(f,x,y,z,a,b,c,p){
-  box3(furnishings,x,f*storey+y,z,a,b,c,p,'',f);
-}
-
-// Un socle, des joints de pierre discrets et une corniche à trois ressauts.
-ext(0,.22,0,13.20,.44,9.18,finish('#9e9788','#817c72','#b6ac98'));
-for(const [y,a,b] of [[17.76,.14,.18],[17.94,.28,.15],[18.09,.48,.13]])
-  ext(0,y,0,13+a,b,9+a,ledge);
-for(let i=0;i<24;i++){
-  const y=.74+i*.72;
-  ext(0,y,4.505,12.98,.022,.015,finish('#a89f8e','#aaa18f','#aaa18f'));
-  for(let j=0;j<6;j++){
-    const x=-5.9+j*2.28+(i%2)*.75;
-    if(x<6.4)ext(x,y+.36,4.507,.018,.69,.015,finish('#b4ab99','#b4ab99','#b4ab99'));
-  }
-}
-for(let f=0;f<7;f++)for(let j=0;j<5;j++){
-  const x=(j-2)*2.42,y=f*storey;
-  if(!f&&j===2)continue;
-  const bottom=y+.49,top=y+2.19;
-  // Encadrement saillant : le vitrage du modèle initial reste en retrait.
-  for(const s of [-1,1])ext(x+s*.695,(bottom+top)/2,4.59,.105,top-bottom,.21,limestone);
-  ext(x,top+.04,4.61,1.60,.15,.25,ledge);
-  ext(x,bottom-.03,4.64,1.60,.13,.33,ledge);
-  if(f===2||f===5){
-    ext(x,bottom-.10,4.90,1.89,.15,.85,ledge);
-    ext(x,bottom+.65,5.27,1.82,.055,.055,ironwork);
-    for(const s of [-1,1])ext(x+s*.89,bottom+.65,4.90,.045,.05,.77,ironwork);
-    for(let k=-4;k<=4;k++)ext(x+k*.20,bottom+.29,5.26,.034,.70,.035,ironwork);
-  }
-}
-// Porte cochère à deux battants, panneaux et impostes.
-const doorPaint=finish('#384841','#253630','#576358');
-for(const s of [-1,1]){
-  ext(s*.37,1.08,4.60,.70,2.08,.12,doorPaint);
-  for(const y of [.59,1.48])ext(s*.37,y,4.68,.50,.60,.035,finish('#45524a','#344137','#59655b'));
-  ext(s*.105,1.07,4.71,.035,.18,.04,finish('#b8a471','#81744f','#d7c18a'));
-}
-ext(0,2.22,4.64,1.71,.15,.25,ledge);
-
-// Lucarnes, joints debout du zinc, pots de cheminée en terre cuite.
-for(let j=-2;j<=2;j++){
-  const x=j*2.38;
-  ext(x,18.67,4.06,.91,.97,.58,slate);
-  ext(x,18.68,4.365,.63,.66,.055,finish('#46565e','#36464e','#677881'));
-  ext(x,19.18,4.04,1.13,.12,.78,slate);
-}
-for(let j=-9;j<=9;j++){
-  const x=j*.64;
-  face3(richerOuter,[[x,18.02,4.71],[x+.035,18.02,4.71],
-    [x+.035,19.80,3.12],[x,19.80,3.12]],'#859096','');
-}
-for(const x of [-4.8,4.7])for(const off of [-.21,.21])
-  ext(x+off,20.86,-1.8,.25,.47,.27,finish('#a56d53','#805642','#b88063'));
-
-// Appartement témoin fictif : séjour à l’avant, pièces d’eau à l’arrière,
-// palier et escalier sur le côté. Les motifs sont de la géométrie fixe.
-for(let f=0;f<7;f++){
-  const put=(x,y,z,a,b,c,p)=>interior(f,x,y,z,a,b,c,p);
-  put(0,.074,0,12.85,.04,8.88,oak);
-  for(let j=0;j<30;j++){
-    const z=-4.32+j*.295;
-    put(0,.099,z,12.78,.008,.014,wood);
-    for(let k=0;k<4;k++){
-      const x=-5.85+k*3.15+(j%3)*.61;
-      if(x<6.3)put(x,.10,z+.143,.014,.008,.277,wood);
-    }
-  }
-  const tile=finish('#a5b4ad','#81938b','#c1ccc4');
-  put(-3.95,.112,-2.61,4.82,.035,3.47,tile);
-  for(let i=0;i<9;i++)put(-6.28+i*.54,.135,-2.61,.018,.008,3.43,plaster);
-  for(let i=0;i<7;i++)put(-3.95,.135,-4.27+i*.54,4.78,.008,.018,plaster);
-
-  // Cloisons sectionnées, avec interruptions à la place des portes.
-  for(const [x,z,a,c] of [[-4.86,-.73,3.04,.13],[-1.84,-.73,.65,.13],
-      [-1.47,-2.75,.13,3.35],[1.10,-3.11,.13,2.63],[1.10,.10,.13,1.23],
-      [3.98,-.82,4.68,.13],[-3.78,4.33,5.18,.15],[4.82,2.88,.14,2.93]])
-    put(x,.63,z,a,1.03,c,plaster);
-
-  // Séjour : canapé, coussins, table basse et tapis.
-  const fabric=finish('#6f8079','#50645d','#91a196');
-  put(-3.16,.13,2.59,3.65,.045,2.31,finish('#9e8372','#8b7365','#b49a84'));
-  put(-3.13,.39,3.65,2.86,.48,.84,fabric);
-  put(-3.13,.71,4.00,2.88,.68,.20,fabric);
-  for(const s of [-1,1])put(-3.13+s*1.34,.57,3.62,.19,.50,.82,fabric);
-  for(const off of [-.83,0,.83])put(-3.13+off,.67,3.56,.78,.13,.58,fabric);
-  put(-3.11,.48,2.22,1.45,.10,.70,wood);
-  for(const s of [-1,1])put(-3.11+s*.56,.28,2.22,.09,.38,.49,ironwork);
-
-  // Cuisine : plan de travail, évier, plaque et rangements.
-  put(-5.81,.55,-2.62,.91,.87,3.03,finish('#87978b','#66776d','#a3ad9e'));
-  put(-5.80,1.01,-2.62,1.02,.09,3.16,porcelain);
-  put(-5.80,1.07,-3.25,.60,.035,.60,finish('#82918e','#738681','#9eafaa'));
-  put(-5.80,1.07,-1.90,.65,.035,.64,ironwork);
-  put(-6.02,1.20,-3.22,.04,.27,.045,ironwork);
-  // Salle d’eau : baignoire à rebord, vasque.
-  put(-.15,.36,-3.59,1.90,.48,.78,porcelain);
-  put(-.15,.61,-3.59,1.59,.025,.53,finish('#aec4c0','#a3b9b5','#c3d7d1'));
-  put(.45,.82,-2.15,.66,.15,.52,porcelain);
-
-  // Chambre : lit, couverture et oreillers.
-  put(3.36,.36,-2.87,1.67,.46,2.22,wood);
-  put(3.36,.63,-2.87,1.62,.20,2.15,porcelain);
-  put(3.36,.75,-2.52,1.64,.09,1.38,finish('#738796','#5a7182','#91a2aa'));
-  for(const s of [-1,1])put(3.36+s*.39,.78,-3.61,.66,.15,.34,porcelain);
-
-  // Escalier à deux volées et palier intermédiaire.
-  for(let k=0;k<8;k++){
-    put(5.22,(k+1)*storey/16,1.09+k*.31,.82,.14,.34,wood);
-    put(6.06,(k+9)*storey/16,3.26-k*.31,.77,.14,.34,wood);
-  }
-  put(5.64,storey/2,3.63,1.68,.16,.48,wood);
-}
-
-// Tronçons terminaux fictifs : jusqu’au point d’usage visible dans la coupe.
-for(let f=0;f<7;f++){
-  const y=f*storey;
-  route([[-5.2,y+.53,-3.3],[-5.80,y+.53,-3.3],[-5.80,y+.97,-3.3]],0,f);
-  route([[-3.5,y+.53,-1.8],[-.63,y+.53,-1.8],[-.63,y+.53,-3.58]],0,f);
-  route([[-2.5,y+.30,-1.2],[-.47,y+.30,-1.2],[-.47,y+.30,-3.58]],1,f);
-  route([[-.9,y+1.08,1.7],[-.9,y+1.08,-1.9],[-5.80,y+1.08,-1.9]],2,f);
-}
-
-try{
-  const gpu=nancyVolumeView(nancyGL);
-  if(gpu){
-    const structure=inside.filter(o=>o.net<0 && o.fill!=='#52655c' && o.fill!=='#677c71');
-    const floors=Array.from({length:7},(_,f)=>({
-      shell:gpu.upload([...structure,...furnishings].filter(o=>o.layer===f)),
-      routes:pipes.map((_,n)=>gpu.upload(inside.filter(o=>o.layer===f&&o.net===n)))
-    }));
-    nancyGpu={...gpu,exterior:gpu.upload(richerOuter),floors};
-  }
-}catch(e){console.warn('Nancy : rendu simplifié disponible.',e)}
 
 function floorPlan(g,w,h,t){
-  const dt=lastTime?Math.min(t-lastTime,.18):0;lastTime=t;
-  const target=scan?1:0;
-  amount+=Math.sign(target-amount)*Math.min(Math.abs(target-amount),reduced?1:dt/.9);
-  const single=scan&&level>=0;
-  const cx=w*.50,cy=h*(single?.50:.52),middle=single?(level+.43)*storey:10;
-  const scale=Math.min(w/(single?19:23),h/(single?16:27));
-  const ca=Math.cos(az),sa=Math.sin(az);
-  const angle=single?Math.max(.68,tilt):tilt,ct=Math.cos(angle),st=Math.sin(angle);
-  function project([x,y,z]){
-    const X=x*ca+z*sa,Z=z*ca-x*sa,Y=y-middle;
-    return [cx+X*scale,cy-(Y*ct-Z*st)*scale,Z*ct+Y*st];
+  const scale=Math.min(w/276,h/170);
+  const x=(w-260*scale)/2,y=(h-154*scale)/2;
+  pcbView={x,y,scale};
+  g.save();g.translate(x,y);g.scale(scale,scale);
+  function rect(x,y,w,h,color){g.fillStyle=color;g.fillRect(x,y,w,h)}
+  function dot(x,y,r,color){
+    g.fillStyle=color;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();
   }
-  function paint(list){
-    const visible=[];
-    for(const item of list){
-      if(single&&item.layer>=0&&item.layer!==level)continue;
-      if(item.net>=0&&network>=0&&item.net!==network)continue;
-      const p=item.points.map(project);
-      visible.push({p,item,d:p.reduce((a,v)=>a+v[2],0)/p.length});
-    }
-    visible.sort((a,b)=>a.d-b.d);
-    for(const {p,item} of visible){
-      g.beginPath();p.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();
-      g.fillStyle=item.fill;g.fill();
-      if(item.edge){g.lineWidth=.6;g.strokeStyle=item.edge;g.stroke()}
-    }
+  function path(points,color,width){
+    g.strokeStyle=color;g.lineWidth=width;g.beginPath();
+    points.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
   }
-  g.fillStyle='#09120f';g.fillRect(0,0,w,h);
-  const step=Math.max(17,scale*2);
-  g.lineWidth=.5;
-  for(let x=cx%step;x<w;x+=step)line(g,x,0,x,h,'#1a2923');
-  for(let y=cy%step;y<h;y+=step)line(g,0,y,w,y,'#1a2923');
 
-  if(nancyGpu){
-    const gl=nancyGL,G=nancyGpu;
-    const factor=Math.min(devicePixelRatio||1,1.5);
-    const W=Math.max(1,Math.round(w*factor)),H=Math.max(1,Math.round(h*factor));
-    if(nancyGLCanvas.width!==W||nancyGLCanvas.height!==H){
-      nancyGLCanvas.width=W;nancyGLCanvas.height=H;
-    }
-    gl.viewport(0,0,W,H);gl.disable(gl.SCISSOR_TEST);
-    gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    gl.uniform2f(G.uniforms.viewport,w,h);
-    gl.uniform4f(G.uniforms.rotation,ca,sa,ct,st);
-    gl.uniform3f(G.uniforms.layout,scale,middle,cy/h);
-    if(amount<1)G.draw(G.exterior);
-    if(amount>0){
-      const sweep=Math.round(H*amount);
-      gl.enable(gl.SCISSOR_TEST);gl.scissor(0,H-sweep,W,sweep);
-      gl.clearColor(.036,.071,.079,1);
-      gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-      for(let f=0;f<7;f++){
-        if(single&&level!==f)continue;
-        const floor=G.floors[f];
-        G.draw(floor.shell);
-        floor.routes.forEach((mesh,n)=>{if(network<0||network===n)G.draw(mesh)});
+  const mask=g.createLinearGradient(0,0,260,154);
+  mask.addColorStop(0,'#28654b');mask.addColorStop(.52,'#124831');mask.addColorStop(1,'#0a3226');
+  rect(1,3,260,154,'#071c13');rect(0,0,260,154,mask);
+  for(const [a,b] of [[8,8],[252,8],[8,146],[252,146]]){
+    dot(a,b,4.6,'#c2a966');dot(a,b,2.8,'#0a1711');
+  }
+
+  // Pistes coudées à 45° et vias métallisés.
+  for(let j=0;j<7;j++){
+    path([[151,72+j*4],[169+j*2,72+j*4],[189+j*2,52+j*4],[218,52+j*4]],'#5a9468',1.25);
+    path([[107,73+j*4],[89-j*2,73+j*4],[75-j*2,87+j*4],[39,87+j*4]],'#639267',1.05);
+    dot(218,52+j*4,1.6,'#c3af75');dot(218,52+j*4,.7,'#254533');
+  }
+  path([[24,39],[42,39],[54,51],[68,51]],'#83a775',3);
+  path([[67,63],[83,63],[98,78],[109,78]],'#83a775',2.7);
+  path([[171,34],[171,55],[186,70],[186,102],[201,117],[215,117]],'#67a071',1.5);
+  for(let i=0;i<5;i++)path([[116+i*6,105],[116+i*6,118],[128+i*6,130],[128+i*6,137]],'#629367',1);
+
+  pcbParts.forEach(([id,name,desc,a,b,W,H,kind],i)=>{
+    rect(a+1.6,b+2,W,H,'#092d20');
+    if(kind==='chip'){
+      for(let k=3;k<W-2;k+=4){
+        rect(a+k,b-3,2,4,'#bdc5b5');rect(a+k,b+H-1,2,4,'#bdc5b5');
       }
-      gl.disable(gl.SCISSOR_TEST);
+      for(let k=3;k<H-2;k+=4){
+        rect(a-3,b+k,4,2,'#a8b4aa');rect(a+W-1,b+k,4,2,'#a8b4aa');
+      }
+      rect(a,b,W,H,'#46524c');rect(a+1,b+1,W-2,H-3,'#242b29');
+      dot(a+4,b+4,1.4,'#85978c');
+      g.fillStyle='#a5b1a7';g.font='5px monospace';
+      g.fillText(i===0?'SPECTRE MCU':id,a+4,b+H*.58);
+    }else if(kind==='coil'){
+      rect(a,b,W,H,'#353936');
+      for(let k=0;k<9;k++){
+        g.beginPath();g.strokeStyle=k%2?'#b77944':'#e4a15e';g.lineWidth=1.8;
+        g.ellipse(a+4+k*2.8,b+H/2,3.3,13,-.12,0,Math.PI*2);g.stroke();
+      }
+    }else if(kind==='cap'){
+      dot(a+W/2,b+H/2,W/2,'#232c28');dot(a+W/2,b+H/2-1,W*.43,'#b7beb2');
+      path([[a+6,b+7],[a+17,b+16]],'#6e7972',1);
+      path([[a+17,b+7],[a+6,b+16]],'#6e7972',1);
+    }else if(kind==='port'){
+      rect(a,b,W,H,'#397784');
+      for(let k=0;k<2;k++){
+        const yy=b+10+k*19;
+        path([[-6,yy-4],[4,yy],[a+6,yy]],k?'#292c31':'#c36655',3.8);
+        dot(a+15,yy,6,'#aeb8ab');path([[a+12,yy+2],[a+18,yy-2]],'#4a5650',1.5);
+      }
+    }else if(kind==='pins'){
+      rect(a,b,W,H,'#262d29');
+      for(let k=0;k<7;k++)rect(a+4+k*7.7,b+3,3.1,6,'#d2b371');
+    }else{
+      rect(a,b,W,H,'#b9c0b2');
+      rect(a+3,b,W-6,H,kind==='led'?'#a7f3ac':'#c39b73');
+      if(kind==='res')rect(a+8,b,2,H,'#624732');
     }
-    g.drawImage(nancyGLCanvas,0,0,w,h);
-    if(amount>0&&amount<1){g.fillStyle='#adf6f4';g.fillRect(0,h*amount-1,w,2)}
-  }else{
-  if(amount<1)paint(outer);
-  if(amount>0){
-    const sweep=h*amount;
-    g.save();g.beginPath();g.rect(0,0,w,sweep);g.clip();
-    g.fillStyle='#09171b';g.fillRect(0,0,w,h);
-    paint(inside);
-    g.restore();
-    if(amount<1){g.fillStyle='#a5f3f7';g.fillRect(0,sweep-1,w,2)}
-  }
-  }
-  if(w>430){
-    label(g,scan?'COUPE / RÉSEAUX SIMULÉS':'FAÇADE / RECONSTITUTION',12,20,'#a8c8b7');
-    if(single)label(g,levelName(level),12,38,'#cbddd1');
-  }
+    g.font='5px monospace';g.fillStyle='#d5ddc5';g.fillText(id,a,b-5);
+    if(i===pcbSelected){
+      g.strokeStyle='#ffe09a';g.lineWidth=1.4;g.strokeRect(a-4,b-4,W+8,H+8);
+    }
+  });
+  g.font='6px monospace';g.fillStyle='#ccdbbc';g.fillText('SPECTRE   PCB–04   REV.B',59,15);
+  g.restore();
 }
 const screens=[[$('orbit'),globe],[$('plan'),floorPlan]];
 let last=0;
@@ -1832,34 +1528,6 @@ requestAnimationFrame(render);
 }
 </style>
 
-<style>
-#garage718 {position:fixed;inset:0;z-index:40;display:grid;
- grid-template-rows:auto minmax(0,1fr) auto;background:#101719;color:#e5ece9;
- font:12px Consolas,monospace}
-#garage718[hidden],#garage-tip[hidden],#garage-beam[hidden]{display:none}
-#garage718 .gbar,#garage718 .gfoot {display:flex;align-items:center;gap:10px;
- padding:12px 16px;background:#101917;border-bottom:1px solid #34433d;flex-wrap:wrap}
-#garage718 .gbar strong {margin-right:auto;letter-spacing:.10em}
-#garage718 button {border:1px solid #4d675b;color:#c6eed7;padding:6px 10px}
-#garage718 button[aria-pressed=true]{background:#21423d;color:#b6fff1}
-#garage-stage {position:relative;min-height:0;overflow:hidden}
-#garage-stage canvas {width:100%;height:100%;touch-action:none;cursor:grab}
-#garage-stage canvas:active {cursor:grabbing}
-#garage718 .gfoot {border:0;border-top:1px solid #34433d;color:#9ab4a7;font-size:11px}
-#garage-tip {position:absolute;pointer-events:none;z-index:3;width:min(245px,85%);
- padding:11px 13px;background:#0a1516f5;border-left:2px solid #98eee3;
- color:#e0f4ee;line-height:1.45}
-#garage-tip strong {display:block;color:#9ff7e1;margin-bottom:3px}
-#garage-beam {position:absolute;inset:0 auto 0 0;width:2px;background:#baffee;
- box-shadow:0 0 15px 4px #70ffda77;pointer-events:none}
-</style>
-<div id="garage718" role="dialog" aria-modal="true" aria-labelledby="garage-name" hidden>
- <div class="gbar"><strong id="garage-name">718 / CAYMAN</strong>
- <button id="garage-scan" type="button" aria-pressed="false">⌖ SCAN INTERNE</button>
- <button id="garage-exit" type="button">← RETOUR</button></div>
- <div id="garage-stage"><div id="garage-tip" hidden></div><i id="garage-beam" hidden></i></div>
- <div class="gfoot" id="garage-status">2.0 TURBO · 300 CH · BVM 6</div>
-</div>
 <div id="clow-port" role="dialog" aria-modal="true" aria-label="Saisie de commande" hidden>
   <form autocomplete="off">
     <label for="clow-input">exec &gt;</label>
@@ -2261,7 +1929,7 @@ requestAnimationFrame(render);
         document.querySelector('#paris-wall [data-slot="main"] canvas') ||
         document.getElementById('camera'))],
       ['ORBITAL TRACKER',capturePanel(document.getElementById('orbit'))],
-      ['FLOOR PLAN',capturePanel(document.getElementById('plan'))],
+      ['PCB / SENSOR BOARD',capturePanel(document.getElementById('plan'))],
       ['KERNEL / TRACE',''],['MEMORY / DUMP',''],['SPECTRE / SHELL','']
     ];
     const faults=['SIGNAL LOST','FRAME DESYNC','BUFFER OVERRUN','BAD CHECKSUM','LINK BROKEN'];
@@ -2360,12 +2028,6 @@ requestAnimationFrame(render);
     e.preventDefault();
     if (state !== 'clow-entry') return;
 
-    if (portInput.value.trim().toLowerCase() === 'car') {
-      port.hidden=true;
-      state='garage';
-      openGarage();
-      return;
-    }
     if (portInput.value.trim().toLowerCase() === 'clow') {
       runClow();
     } else {
@@ -2378,357 +2040,6 @@ requestAnimationFrame(render);
     if (state === 'clow-black' && restoreKey.value.endsWith('3000')) resumePrism();
   });
 
-
-  const garage=document.getElementById('garage718');
-  const stage=document.getElementById('garage-stage');
-  const garageExit=document.getElementById('garage-exit');
-  const garageScan=document.getElementById('garage-scan');
-  const garageStatus=document.getElementById('garage-status');
-  let viewer=null, garageLoading=null;
-  async function openGarage(){
-    garage.hidden=false;garageExit.focus();
-    garageStatus.textContent='CHARGEMENT DU MODÈLE…';
-    try{
-      if(!garageLoading)garageLoading=import('./three-718.module.js')
-        .then(createGarage).catch(err=>{garageLoading=null;throw err});
-      viewer=await garageLoading;
-      if(state==='garage')viewer.start();
-    }catch(err){
-      garageStatus.textContent='Vue 3D indisponible. Vérifie WebGL et le fichier three-718.module.js.';
-      console.error(err);
-    }
-  }
-  function closeGarage(){
-    viewer?.stop();garage.hidden=true;
-    state='stream';prism.focus({preventScroll:true});
-  }
-  garageExit.onclick=closeGarage;
-  garageScan.onclick=()=>viewer?.toggle();
-
-  function createGarage(T){
-    const renderer=new T.WebGLRenderer({antialias:true,alpha:false});
-    renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
-    renderer.outputEncoding=T.sRGBEncoding;
-    renderer.setScissorTest(false);
-    const canvas=renderer.domElement;
-    stage.prepend(canvas);
-    const scene=new T.Scene();scene.background=new T.Color(0x262729);
-    const camera=new T.PerspectiveCamera(33,1,.05,90);
-    scene.add(new T.HemisphereLight(0xe9f4ff,0x758078,1.25));
-    for(const [x,y,z,power] of [[-4,7,5,1.35],[3,4,-4,1.05]]){
-      const lamp=new T.DirectionalLight(0xffffff,power);
-      lamp.position.set(x,y,z);scene.add(lamp);
-    }
-    const floor=new T.GridHelper(16,48,0x506461,0x2c393b);
-    floor.position.y=-.012;floor.visible=false;scene.add(floor);
-    const shell=new T.Group(),parts=new T.Group(),wheels=new T.Group();
-    scene.add(shell,parts,wheels);
-    const gridItems=[],outerItems=[];
-    const mat=(color,metal=.12,rough=.42)=>new T.MeshStandardMaterial({
-      color,metalness:metal,roughness:rough,side:T.DoubleSide});
-    const paint=mat(0x779caa,.48,.26),glass=mat(0x243940,.35,.19);
-    const rubber=mat(0x1d2021,0,.88),alloy=mat(0xa8b5ba,.55,.30);
-    const dark=mat(0x354044),leather=mat(0x514b42,0,.78);
-    const gold=mat(0xc49046),silver=mat(0x97a3ab),red=mat(0xc74d43);
-    const coolant=mat(0x449cbb),hose=mat(0x485053),lampGlass=mat(0xe2f4ef);
-    const makeInfo=(name,text)=>({name,text});
-    const chassis=makeInfo('Carrosserie du coupé','La ligne de toit fixe descend derrière les sièges. Les prises d’air latérales alimentent le compartiment moteur.');
-    const cabin=makeInfo('Habitacle biplace','Deux sièges. Le moteur est installé derrière la cloison arrière de l’habitacle.');
-    const engine=makeInfo('Boxer turbo · 2,0 litres','Quatre cylindres opposés à plat, deux de chaque côté du vilebrequin. Cette version développe 300 ch et 380 Nm.');
-    const turbo=makeInfo('Turbocompresseur','Les gaz d’échappement entraînent une turbine. Sur le même axe, un compresseur augmente la pression de l’air admis.');
-    const gearbox=makeInfo('Boîte manuelle · 6 rapports','Elle adapte le régime et le couple transmis aux roues arrière. Le levier se trouve entre les sièges.');
-    const axle=makeInfo('Demi-arbres de transmission','À gauche et à droite, ils transmettent le couple du différentiel aux roues arrière.');
-    const brake=makeInfo('Frein à disque','L’étrier serre ses plaquettes contre le disque solidaire de la roue. La friction ralentit la voiture.');
-    const radiator=makeInfo('Refroidissement','Les radiateurs avant échangent la chaleur avec l’air extérieur. Les conduites bleues illustrent le circuit vers le moteur.');
-    const exhaust=makeInfo('Échappement','Les gaz sortant du moteur passent par la ligne d’échappement et le silencieux arrière.');
-    const steer=makeInfo('Volant et colonne','La colonne relie le volant au mécanisme de direction qui oriente les roues avant.');
-    const rim=makeInfo('Roue et jante','La jante porte le pneu. En coupe, la roue s’efface pour dégager le disque et l’étrier.');
-    function add(parent,geometry,material,x,y,z,info){
-      const m=new T.Mesh(geometry,material);m.position.set(x,y,z);
-      m.userData.info=info;parent.add(m);
-      (parent===parts?gridItems:outerItems).push(m);return m;
-    }
-    function box(parent,x,y,z,a,b,c,m,info){
-      return add(parent,new T.BoxGeometry(a,b,c),m,x,y,z,info);
-    }
-    function ell(parent,x,y,z,a,b,c,m,info){
-      const v=add(parent,new T.SphereGeometry(1,24,14),m,x,y,z,info);
-      v.scale.set(a,b,c);return v;
-    }
-    function rod(parent,A,B,r,m,info){
-      const a=new T.Vector3(...A),b=new T.Vector3(...B),delta=b.clone().sub(a);
-      const mid=a.clone().add(b).multiplyScalar(.5);
-      const v=add(parent,new T.CylinderGeometry(r,r,delta.length(),16),m,mid.x,mid.y,mid.z,info);
-      v.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),delta.normalize());return v;
-    }
-    function ring(parent,x,y,z,r,tube,m,info){
-      return add(parent,new T.TorusGeometry(r,tube,12,44),m,x,y,z,info);
-    }
-
-    // Axe longitudinal X : avant négatif, moteur et transmission à l’arrière.
-    // Sections de carrosserie à largeur et hauteur variables.
-
-    function caymanWireLoft(rows,material){
-      // Chaque section suit la largeur et la hauteur de la carrosserie.
-      // L’interpolation longitudinale adoucit le passage d’une section à l’autre.
-      const profile=new T.CatmullRomCurve3(
-        rows.map(([x,w,base,top])=>new T.Vector3(x,w,base)),
-        false,'centripetal'
-      );
-      const roof=new T.CatmullRomCurve3(
-        rows.map(([x,w,base,top])=>new T.Vector3(x,top,0)),
-        false,'centripetal'
-      );
-      const contour=new T.CatmullRomCurve3([
-        [-1,.28],[-.98,.72],[-.79,.96],[0,1],[.79,.96],
-        [.98,.72],[1,.28],[.81,0],[0,0],[-.81,0]
-      ].map(([w,h])=>new T.Vector3(w,h,0)),true,'centripetal');
-
-      const length=rows[rows.length-1][0]-rows[0][0];
-      const bands=Math.max(10,Math.ceil(length*12)),around=32;
-      const vertices=[],indices=[];
-      for(let i=0;i<=bands;i++){
-        const t=i/bands,p=profile.getPoint(t),top=roof.getPoint(t).y;
-        for(let j=0;j<around;j++){
-          const q=contour.getPoint(j/around);
-          vertices.push(p.x,p.z+(top-p.z)*q.y,p.y*q.x);
-        }
-      }
-      for(let i=0;i<bands;i++)for(let j=0;j<around;j++){
-        const a=i*around+j,b=i*around+(j+1)%around;
-        const c=a+around,d=b+around;
-        if((i+j)%2)indices.push(a,b,c,b,d,c);
-        else indices.push(a,b,d,a,d,c);
-      }
-      // Les extrémités restent fermées pour masquer les fils de la face opposée.
-      for(const i of [0,bands]){
-        const center=vertices.length/3, p=profile.getPoint(i/bands);
-        vertices.push(p.x,(p.z+roof.getPoint(i/bands).y)/2,0);
-        for(let j=0;j<around;j++){
-          const a=i*around+j,b=i*around+(j+1)%around;
-          if(i===0)indices.push(center,b,a);else indices.push(center,a,b);
-        }
-      }
-      const geometry=new T.BufferGeometry();
-      geometry.setAttribute('position',new T.Float32BufferAttribute(vertices,3));
-      geometry.setIndex(indices);geometry.computeVertexNormals();
-      return add(shell,geometry,material,0,0,0,chassis);
-    }
-    caymanWireLoft([[-2.13,.64,.27,.55],[-1.91,.81,.25,.71],[-1.44,.86,.27,.78],
-      [-.75,.84,.28,.75],[.18,.83,.27,.73],[.85,.88,.27,.80],
-      [1.40,.90,.26,.88],[1.92,.81,.30,.79],[2.12,.71,.34,.72]],paint);
-    caymanWireLoft([[-.79,.70,.705,.74],[-.41,.62,.72,1.08],[-.13,.59,.73,1.24],
-      [.32,.60,.74,1.25],[.67,.66,.76,1.12],[1.16,.73,.78,.88]],glass);
-    caymanWireLoft([[-.22,.50,1.19,1.23],[-.05,.56,1.21,1.275],
-      [.30,.56,1.21,1.27],[.48,.49,1.17,1.22]],paint);
-    for(const s of [-1,1]){
-      rod(shell,[-.76,.75,s*.70],[-.16,1.23,s*.53],.032,paint,chassis);
-      rod(shell,[.41,1.22,s*.54],[1.15,.84,s*.70],.052,paint,chassis);
-      ell(shell,-1.71,.72,s*.65,.25,.069,.128,lampGlass,chassis);
-      ell(shell,1.99,.66,s*.57,.082,.047,.23,red,chassis);
-      ell(shell,.71,.57,s*.855,.20,.095,.026,dark,chassis);
-      ell(shell,-.48,.90,s*.89,.105,.055,.082,paint,chassis);
-      rod(shell,[-.49,.85,s*.71],[-.48,.89,s*.88],.022,dark,chassis);
-      box(shell,-1.997,.42,s*.52,.18,.10,.25,dark,chassis);
-    }
-
-    for(const x of [-1.25,1.23])for(const s of [-1,1]){
-      const z=s*.83;
-      ring(wheels,x,.36,z,.258,.100,rubber,rim);
-      ring(wheels,x,.36,z+s*.077,.215,.023,alloy,rim);
-      for(let k=0;k<10;k++){
-        const a=k*Math.PI/5;
-        rod(wheels,[x,.36,z+s*.079],
-            [x+.202*Math.cos(a),.36+.202*Math.sin(a),z+s*.08],.015,alloy,rim);
-      }
-      rod(parts,[x,.36,z-.034],[x,.36,z+.034],.17,alloy,brake);
-      box(parts,x+.125,.39,z,.065,.15,.09,red,brake);
-    }
-    // Sièges baquets, console centrale, levier, volant et planche de bord.
-    for(const s of [-1,1]){
-      ell(parts,.04,.39,s*.37,.32,.115,.225,leather,cabin);
-      const back=ell(parts,.27,.64,s*.37,.095,.30,.215,leather,cabin);
-      back.rotation.z=-.18;
-      ell(parts,.32,.94,s*.37,.071,.098,.125,leather,cabin);
-      for(const k of [-1,1])ell(parts,.06,.47,s*.37+k*.19,.22,.08,.055,dark,cabin);
-    }
-    box(parts,-.52,.72,0,.22,.15,1.33,dark,cabin);
-    box(parts,-.04,.42,0,.58,.16,.19,dark,gearbox);
-    rod(parts,[-.13,.47,0],[-.11,.61,0],.014,alloy,gearbox);
-    ell(parts,-.11,.63,0,.035,.042,.035,dark,gearbox);
-    const wheel=ring(parts,-.38,.72,.36,.132,.018,dark,steer);
-    wheel.rotation.y=Math.PI/2-.30;
-    rod(parts,[-.37,.72,.36],[-1.13,.36,.16],.025,alloy,steer);
-
-    box(parts,.83,.43,0,.48,.30,.39,silver,engine);
-    for(const s of [-1,1]){
-      box(parts,.84,.45,s*.36,.53,.23,.22,dark,engine);
-      for(const x of [.69,.96]){
-        rod(parts,[x,.46,s*.14],[x,.46,s*.43],.105,silver,engine);
-        for(let k=0;k<3;k++)
-          box(parts,x-.08+k*.074,.58,s*.33,.025,.026,.24,alloy,engine);
-      }
-    }
-    ell(parts,1.38,.40,0,.32,.17,.19,gold,gearbox);
-    for(let k=0;k<5;k++)ring(parts,1.19+k*.075,.40,0,.144,.012,silver,gearbox).rotation.y=Math.PI/2;
-    rod(parts,[1.23,.36,-.78],[1.23,.36,.78],.035,alloy,axle);
-    ring(parts,1.07,.66,-.41,.096,.042,silver,turbo);
-    rod(parts,[.89,.59,-.33],[1.06,.66,-.41],.043,hose,turbo);
-    box(parts,1.80,.36,0,.27,.16,.64,silver,exhaust);
-    for(const s of [-1,1]){
-      rod(parts,[.87,.32,s*.42],[1.77,.34,s*.24],.04,gold,exhaust);
-      rod(parts,[1.79,.35,s*.17],[2.06,.35,s*.12],.052,dark,exhaust);
-      box(parts,-1.79,.45,s*.49,.12,.32,.40,silver,radiator);
-      for(let k=0;k<6;k++)
-        box(parts,-1.86,.33+k*.046,s*.49,.018,.014,.37,dark,radiator);
-      rod(parts,[-1.75,.33,s*.55],[.79,.33,s*.55],.027,coolant,radiator);
-    }
-
-
-    // Vue extérieure : surface opaque sombre + arêtes fines.
-    // Les arêtes sont attachées à la pièce : elles suivent son échelle,
-    // sa rotation et sa disparition derrière le rideau du scanner.
-    paint.color.setHex(0x24557b);
-    paint.metalness=.18;paint.roughness=.68;
-    glass.color.setHex(0x111519);
-    glass.metalness=.05;glass.roughness=.82;
-    alloy.color.setHex(0x596067);
-    lampGlass.color.setHex(0x27333c);
-
-    const wirePaint=new T.LineBasicMaterial({
-      color:0x9ac8e8,transparent:true,opacity:.46,depthWrite:false
-    });
-    const wireGlass=new T.LineBasicMaterial({
-      color:0xaeb8c0,transparent:true,opacity:.37,depthWrite:false
-    });
-    const wireTrim=new T.LineBasicMaterial({
-      color:0xbfc4c7,transparent:true,opacity:.40,depthWrite:false
-    });
-    for(const mesh of outerItems){
-      const surface=mesh.material;
-      surface.polygonOffset=true;
-      surface.polygonOffsetFactor=1;
-      surface.polygonOffsetUnits=1;
-      const ink=surface===paint?wirePaint:surface===glass?wireGlass:wireTrim;
-      const lines=new T.LineSegments(new T.WireframeGeometry(mesh.geometry),ink);
-      lines.renderOrder=2;
-      mesh.add(lines);
-    }
-
-    // Insert sombre sur le capot. Il épouse la surface existante :
-    // ses triangles suivent exactement la courbure et tournent avec elle.
-    const body=outerItems[0];
-    const baseGeom=body.geometry;
-    const attr=baseGeom.getAttribute('position');
-    const sourceIndex=baseGeom.getIndex();
-    const hoodTriangles=[];
-    for(let k=0;k<sourceIndex.count;k+=3){
-      const a=sourceIndex.getX(k),b=sourceIndex.getX(k+1),c=sourceIndex.getX(k+2);
-      const x=(attr.getX(a)+attr.getX(b)+attr.getX(c))/3;
-      const y=(attr.getY(a)+attr.getY(b)+attr.getY(c))/3;
-      const z=(attr.getZ(a)+attr.getZ(b)+attr.getZ(c))/3;
-      const u=(x+1.95)/1.13;
-      if(u>0 && u<1 && y>.60 && Math.abs(z)<.44+.085*Math.sin(u*Math.PI))
-        hoodTriangles.push(a,b,c);
-    }
-    if(hoodTriangles.length){
-      const geo=new T.BufferGeometry();
-      geo.setAttribute('position',attr);
-      geo.setAttribute('normal',baseGeom.getAttribute('normal'));
-      geo.setIndex(hoodTriangles);
-      const hoodMat=mat(0x161b20,.10,.71);
-      hoodMat.polygonOffset=true;
-      hoodMat.polygonOffsetFactor=.5;hoodMat.polygonOffsetUnits=.5;
-      const hood=new T.Mesh(geo,hoodMat);
-      hood.renderOrder=1;body.add(hood);
-    }
-
-    const tip=document.getElementById('garage-tip'),beam=document.getElementById('garage-beam');
-    const title=document.createElement('strong'),desc=document.createElement('span');
-    tip.append(title,desc);
-    const ray=new T.Raycaster(),pointer=new T.Vector2();
-    let az=.69,el=.38,dist=6.9,drag=null,hover=null;
-    let scan=false,progress=0,frame=0,running=false,last=0;
-    function clearTip(){
-      if(hover){hover.material=hover.userData.baseMaterial;hover=null}
-      tip.hidden=true;
-    }
-    const highlight=mat(0x7ef9d9,.18,.32);
-    function inspect(e){
-      clearTip();
-      if(drag||progress!==Number(scan))return;
-      const r=canvas.getBoundingClientRect();
-      pointer.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);
-      ray.setFromCamera(pointer,camera);
-      const hit=ray.intersectObjects(scan?gridItems:outerItems,false)[0];
-      if(!hit)return;
-      hover=hit.object;hover.userData.baseMaterial=hover.material;hover.material=highlight;
-      title.textContent=hover.userData.info.name;desc.textContent=hover.userData.info.text;
-      tip.hidden=false;
-      tip.style.left=Math.max(4,Math.min(e.clientX-r.left+14,r.width-tip.offsetWidth-5))+'px';
-      tip.style.top=Math.max(4,Math.min(e.clientY-r.top+14,r.height-tip.offsetHeight-5))+'px';
-    }
-    canvas.onpointerdown=e=>{
-      if(!e.isPrimary||e.button!==0)return;
-      clearTip();drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);
-    };
-    canvas.onpointermove=e=>{
-      if(!drag){inspect(e);return}
-      az-=(e.clientX-drag[0])*.009;
-      el=Math.max(.06,Math.min(1.46,el+(e.clientY-drag[1])*.008));
-      drag=[e.clientX,e.clientY];
-    };
-    canvas.onlostpointercapture=()=>{drag=null};
-    canvas.onpointerleave=clearTip;
-    canvas.addEventListener('wheel',e=>{
-      e.preventDefault();clearTip();
-      dist=Math.min(11,Math.max(3.2,dist*Math.exp(Math.max(-200,Math.min(200,e.deltaY))*.0015)));
-    },{passive:false});
-    function layer(interior){
-      shell.visible=wheels.visible=!interior;
-      parts.visible=interior;
-    }
-    function draw(now){
-      if(!running)return;
-      frame=requestAnimationFrame(draw);
-      const w=stage.clientWidth,h=stage.clientHeight;
-      if(!w||!h)return;
-      const dt=Math.min((now-last)/1000,.1);last=now;
-      const goal=Number(scan);
-      progress+=Math.sign(goal-progress)*Math.min(Math.abs(goal-progress),
-        matchMedia('(prefers-reduced-motion: reduce)').matches?1:dt/1.0);
-      const ratio=renderer.getPixelRatio();
-      if(canvas.width!==Math.floor(w*ratio)||canvas.height!==Math.floor(h*ratio))
-        renderer.setSize(w,h,false);
-      camera.aspect=w/h;camera.updateProjectionMatrix();
-      const radius=dist*Math.max(1,1.35/camera.aspect);
-      camera.position.set(-Math.sin(az)*Math.cos(el)*radius,.56+Math.sin(el)*radius,
-                           Math.cos(az)*Math.cos(el)*radius);
-      camera.lookAt(0,.56,0);
-      renderer.setScissorTest(false);
-      layer(progress===1);renderer.render(scene,camera);
-      if(progress>0&&progress<1){
-        renderer.setScissorTest(true);renderer.setScissor(0,0,Math.round(w*progress),h);
-        layer(true);renderer.render(scene,camera);renderer.setScissorTest(false);
-        beam.hidden=false;beam.style.left=(progress*100)+'%';
-      }else beam.hidden=true;
-    }
-    function updateButton(){
-      garageScan.textContent=scan?'↥ CARROSSERIE':'⌖ SCAN INTERNE';
-      garageScan.setAttribute('aria-pressed',String(scan));
-      garageStatus.textContent=scan?'COUPE TECHNIQUE · SURVOLE UNE PIÈCE':
-        '718 CAYMAN / 2.0 TURBO · 300 CH · BVM 6';
-    }
-    return {
-      start(){
-        if(running)return;
-        clearTip();scan=false;progress=0;drag=null;az=.80;el=.57;dist=6.6;
-        updateButton();last=performance.now();running=true;draw(last);
-      },
-      stop(){running=false;cancelAnimationFrame(frame);clearTip();drag=null;beam.hidden=true},
-      toggle(){clearTip();scan=!scan;updateButton()}
-    };
-  }
 
   function enterStream() {
     buildStream();
@@ -2813,15 +2124,6 @@ requestAnimationFrame(render);
 
 
 
-    if(state==='garage'){
-      if(e.key==='Escape'){
-        e.preventDefault();e.stopImmediatePropagation();closeGarage();
-      }else if(e.key==='Tab'){
-        e.preventDefault();
-        (document.activeElement===garageExit?garageScan:garageExit).focus();
-      }
-      return;
-    }
     const portShortcut = e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey &&
                          (e.code === 'KeyP' || e.key.toLowerCase() === 'p');
     if (state === 'stream' && portShortcut) {
