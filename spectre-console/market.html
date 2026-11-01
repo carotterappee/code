@@ -913,6 +913,81 @@ function localMarket(){
 function localClose(){
   reportVersion++;localPanel.hidden=true;$('la-open').focus();
 }
+
+let archivePromise=null;
+function archiveLoad(){
+  if(!archivePromise){
+    archivePromise=fetch('./analyste/histoire-marches.json')
+      .then(async r=>{
+        if(!r.ok)throw Error('HTTP '+r.status);
+        const rows=await r.json();
+        if(!Array.isArray(rows)||!rows.length)throw Error('Bibliothèque vide');
+        return rows;
+      }).catch(e=>{archivePromise=null;throw e});
+  }
+  return archivePromise;
+}
+function archiveNormalize(text){
+  return String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ').trim();
+}
+function archiveSearch(rows,query){
+  const text=' '+archiveNormalize(query)+' ';
+  const words=new Set(text.trim().split(/\s+/));
+  return rows.map(row=>{
+    let score=0;
+    for(const raw of row.tags){
+      const tag=archiveNormalize(raw);
+      if(text.includes(' '+tag+' '))score+=tag.includes(' ')?5:3;
+    }
+    for(const word of archiveNormalize(row.titre).split(' ')){
+      if(word.length>=5&&words.has(word))score++;
+    }
+    return {row,score};
+  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.row);
+}
+function archiveButton(label,fn){
+  const b=document.createElement('button');b.type='button';b.textContent=label;
+  b.style.cssText='display:block;width:100%;margin:6px 0;text-align:left';
+  b.onclick=fn;return b;
+}
+function archiveCase(row,back){
+  localOut.replaceChildren();
+  const h=document.createElement('strong');h.textContent=row.date+' · '+row.lieu+' / '+row.titre;
+  localOut.append(h);
+  for(const [key,label] of [['contexte','Le contexte'],['acteurs','Qui intervient ?'],
+    ['logique','La logique de la décision'],['suite','Ce qui se passe ensuite'],['regle','La règle à retenir']]){
+    const p=document.createElement('p'),b=document.createElement('b');
+    b.textContent=label+' ';p.append(b,document.createElement('br'),document.createTextNode(row[key]));
+    localOut.append(p);
+  }
+  localOut.append(localLink(row.source+' ↗',row.url),archiveButton('← Autres dossiers',back));
+  localOut.scrollIntoView({block:'nearest'});
+}
+async function archiveShow(query=''){
+  const version=++reportVersion;
+  localOut.textContent='Ouverture des archives…';
+  try{
+    const rows=await archiveLoad();
+    if(version!==reportVersion)return;
+    const matches=query?archiveSearch(rows,query):rows;
+    function menu(){
+      localOut.replaceChildren();
+      const intro=document.createElement('strong');
+      intro.textContent=query?'Dossiers correspondant à ta question':'Archives / Histoire des marchés';
+      localOut.append(intro);
+      if(!matches.length)localOut.append(document.createTextNode('\nAucune fiche précise pour cette recherche.'));
+      for(const row of matches){
+        localOut.append(archiveButton(row.date+' · '+row.titre,()=>archiveCase(row,menu)));
+      }
+      if(query)localOut.append(archiveButton('Voir toute la bibliothèque',()=>archiveShow()));
+    }
+    if(query&&matches.length===1)archiveCase(matches[0],menu);else menu();
+  }catch{
+    if(version===reportVersion)localOut.textContent='Bibliothèque indisponible. Vérifie que le dossier analyste a bien été envoyé sur GitHub.';
+  }
+}
+
 async function localReport(mode){
   const version=++reportVersion;
   const name=localMarket();
@@ -953,14 +1028,7 @@ async function localReport(mode){
     return;
   }
 
-  if(mode==='history'){
-    localOut.textContent='21 juillet 2022 · La BCE annonce une hausse de 0,50 point de ses trois taux directeurs.\n\n'+
-      'Le mécanisme : pour une obligation existante à taux fixe, si le rendement exigé par le marché monte, son prix baisse, toutes choses égales par ailleurs.\n\n'+
-      (currentMarket===sovereignIndex?
-       'Sur ton écran, le rendement français à dix ans dépend aussi des anticipations sur plusieurs années. Il peut donc évoluer avant même une annonce de la BCE.':
-       'Ce précédent éclaire le contexte des taux. Pour attribuer le mouvement du marché sélectionné à une annonce, il faudrait comparer les heures, les attentes et les autres événements.')+'\n\n';
-    localOut.append(localLink('Lire la décision de la BCE ↗',bceHistory));return;
-  }
+  if(mode==='history'){await archiveShow();return}
 
   if(currentMarket===sovereignIndex){
     const read=id=>$(id)?.textContent.trim()||'indisponible';
@@ -1012,6 +1080,10 @@ $('la-form').onsubmit=e=>{
   e.preventDefault();
   const q=$('la-question').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(!q)return;
+
+  const archiveIntent=/\b(1602|1929|1987|2007|2008|2009|2022|madoff|ponzi|subprimes?|lehman|ldi|gilts?|voc|krach|kr[a]?ch|crises?|fraudes?|amsterdam|archives?|historiques?|histoire)\b/.test(q)
+    || /appel de (marge|garantie)|fonds de pension|lundi noir|assurance de portefeuille|vente[s]? forcee[s]?|pourquoi.*vendai|origine.*bourse|regles? du (jeu|marche)/.test(q);
+  if(archiveIntent){archiveShow(q);return}
   if(/actu|nouvelle|annonce|presse/.test(q))localReport('news');
   else if(/histo|precedent historique|2022|crise/.test(q))localReport('history');
   else if(/bid|ask|spread|meilleur achat|meilleure vente|ecart/.test(q))
