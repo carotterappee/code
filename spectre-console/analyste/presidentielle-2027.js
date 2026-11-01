@@ -253,7 +253,7 @@
         card.append(scenarioPlot(up,down));
         for (const e of evidence) {
           card.append(el('p',(e.sign > 0 ? '↗ ' : '↘ ')+e.group+' — '+e.reason));
-          addMeasure(card,e.measure,db);
+          
         }
       } else {
         card.append(el('p','Les mesures analysées ne permettent pas de déterminer une direction avec les règles disponibles.'));
@@ -267,6 +267,14 @@
     parent.replaceChildren();
     const measures=(c.measures||[]).filter(m=>
       m.status==='active' && ['programme','declaration'].includes(m.kind));
+    // Affichage des conclusions uniquement
+    parent.append(
+      el('small','ANALYSTE / PERSPECTIVES SECTORIELLES','polit-kicker'),
+      el('h3',name(c))
+    );
+    renderSectorOutlook(parent,measures,db);
+    return;
+
     const texts=measures.map(m=>normal(m.title+' '+m.detail));
     const classified=new Set();
     const report=branches.map(([name,pattern,mechanism])=>{
