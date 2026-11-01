@@ -299,6 +299,21 @@ elements.forEach(([symbol,name],i)=>atomSelect.add(new Option(symbol+' · '+name
 let atomIndex=2,orbIndex=2,atomYaw=.52,atomPitch=.22,atomZoom=1;
 let atomRunning=!reduced,atomDrag=null,atomTime=0,atomPrevious=0;
 let atomPoints=[],nucleons=[],atomArea=null,atomSeed=718;
+
+let atomDetach=null,atomHitBalls=[],atomTouch=null;
+function atomReturn(){
+  if(atomDetach)atomDetach.returning=true;
+}
+function atomPickBall(e){
+  const rect=atomCanvas.getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
+  // La dernière sphère dessinée est celle qui passe devant ses voisines.
+  for(let i=atomHitBalls.length-1;i>=0;i--){
+    const b=atomHitBalls[i];
+    if(Math.hypot(x-b.x,y-b.y)<=b.r+1)return b;
+  }
+  return null;
+}
 function atomRand(){
   atomSeed=(Math.imul(atomSeed,1664525)+1013904223)>>>0;
   return (atomSeed+.5)/4294967296;
@@ -333,6 +348,7 @@ function orbitalSample(){
   }
 }
 function setAtom(i){
+  atomDetach=null;atomHitBalls=[];atomTouch=null;
   atomIndex=i;atomSelect.value=String(i);atomZoom=1;atomTip.hidden=true;
   const [symbol,name,Z,A,counts]=elements[i];
   orbIndex=counts.length-1;
@@ -367,7 +383,7 @@ atomSelect.onchange=()=>setAtom(Number(atomSelect.value));
 setAtom(2);syncAtomPlay();
 
 function atomInspect(e){
-  if(!atomPanel.classList.contains('max')||!atomArea){atomTip.hidden=true;return}
+  if(atomDetach||!atomPanel.classList.contains('max')||!atomArea){atomTip.hidden=true;return}
   const rect=atomCanvas.getBoundingClientRect();
   const x=e.clientX-rect.left,y=e.clientY-rect.top;
   const dx=x-atomArea.cx,dy=y-atomArea.cy,dist=Math.hypot(dx,dy);
@@ -387,15 +403,35 @@ function atomInspect(e){
 }
 atomCanvas.onpointerdown=e=>{
   if(!e.isPrimary||e.button!==0)return;
-  atomDrag=[e.clientX,e.clientY];atomCanvas.setPointerCapture(e.pointerId);atomInspect(e);
+  atomTouch={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};
+  atomDrag=[e.clientX,e.clientY];
+  atomCanvas.setPointerCapture(e.pointerId);atomInspect(e);
 };
 atomCanvas.onpointermove=e=>{
   if(!atomDrag){atomInspect(e);return}
+  if(atomTouch && Math.hypot(e.clientX-atomTouch.x,e.clientY-atomTouch.y)>4)
+    atomTouch.moved=true;
   atomYaw+=(e.clientX-atomDrag[0])*.009;
   atomPitch=Math.max(-1.53,Math.min(1.53,atomPitch+(e.clientY-atomDrag[1])*.009));
   atomTip.hidden=true;atomDrag=[e.clientX,e.clientY];
 };
-atomCanvas.onlostpointercapture=()=>{atomDrag=null};
+
+atomCanvas.onpointerup=e=>{
+  if(atomTouch && atomTouch.id===e.pointerId && !atomTouch.moved){
+    const hit=atomPickBall(e);
+    if(hit){
+      if(atomDetach){
+        atomReturn();
+      }else{
+        atomDetach={id:hit.id,progress:0,returning:false};
+        atomTip.hidden=true;
+      }
+    }
+  }
+  atomTouch=null;atomDrag=null;
+};
+atomCanvas.onlostpointercapture=()=>{atomTouch=null;atomDrag=null};
+
 atomCanvas.onpointerleave=()=>{atomTip.hidden=true};
 atomCanvas.addEventListener('wheel',e=>{
   e.preventDefault();atomTip.hidden=true;
@@ -1109,7 +1145,7 @@ function globe(g,w,h,t) {
 
 function drawAtom(g,w,h,t){
   const dt=atomPrevious?Math.min(.15,t-atomPrevious):0;atomPrevious=t;
-  if(atomRunning&&!atomDrag&&atomTip.hidden){atomYaw+=dt*.12;atomTime+=dt}
+  if(atomRunning&&!atomDrag&&!atomDetach&&atomTip.hidden){atomYaw+=dt*.12;atomTime+=dt}
   const cx=w*.5,cy=h*.52,R=Math.min(w*.34,h*.39)*atomZoom;
   const ca=Math.cos(atomYaw),sa=Math.sin(atomYaw),cp=Math.cos(atomPitch),sp=Math.sin(atomPitch);
   function project(x,y,z){
@@ -1134,14 +1170,80 @@ function drawAtom(g,w,h,t){
   }
   g.globalAlpha=1;
   const unit=Math.max(3,Math.min(w,h)*.029*atomZoom);
-  const balls=nucleons.map(([x,y,z,p])=>[...project(x,y,z),p]).sort((a,b)=>a[2]-b[2]);
-  for(const [x,y,z,proton] of balls){
-    const X=cx+x*unit,Y=cy-y*unit,r=unit*.55;
+
+  const balls=nucleons.map(([x,y,z,p],id)=>[...project(x,y,z),p,id])
+    .sort((a,b)=>a[2]-b[2]);
+  atomHitBalls=[];
+
+  function sphere(X,Y,r,proton,id){
     const light=g.createRadialGradient(X-r*.35,Y-r*.4,0,X,Y,r);
-    light.addColorStop(0,proton?'#ffe1bb':'#d9edff');
-    light.addColorStop(.45,proton?'#ef885e':'#80abc7');
+    light.addColorStop(0,proton?'#ffe1bb':'#e2f4ff');
+    light.addColorStop(.42,proton?'#ef885e':'#80abc7');
     light.addColorStop(1,proton?'#793c38':'#35485f');
     g.fillStyle=light;g.beginPath();g.arc(X,Y,r,0,Math.PI*2);g.fill();
+    atomHitBalls.push({x:X,y:Y,r,id});
+  }
+
+  const baseR=unit*.55;
+  for(const [x,y,z,proton,id] of balls){
+    if(atomDetach && atomDetach.id===id)continue;
+    sphere(cx+x*unit,cy-y*unit,baseR,proton,id);
+  }
+
+  if(atomDetach){
+    const d=atomDetach;
+    const dir=d.returning?-1:1;
+    d.progress=Math.max(0,Math.min(1,d.progress+dir*(reduced?1:dt/.72)));
+    const u=d.progress*d.progress*(3-2*d.progress);
+    const [x,y,z,proton,id]=balls.find(ball=>ball[4]===d.id);
+    const ox=cx+x*unit,oy=cy-y*unit;
+    const destX=w*.78,destY=h*.36;
+    const X=ox+(destX-ox)*u;
+    const Y=oy+(destY-oy)*u-Math.sin(Math.PI*u)*Math.min(42,h*.11);
+    const r=baseR+(Math.max(baseR,Math.min(w,h)*.066)-baseR)*u;
+    const accent=proton?'#ffab83':'#9edcff';
+
+    g.save();
+    g.globalAlpha=u;
+    // Un petit cercle vide garde la place de la particule dans le noyau.
+    g.strokeStyle=accent;g.lineWidth=1;
+    g.beginPath();g.arc(ox,oy,Math.max(3,baseR*.82),0,Math.PI*2);g.stroke();
+    g.setLineDash([4,5]);
+    g.beginPath();g.moveTo(ox,oy);g.lineTo(X,Y);g.stroke();
+    g.setLineDash([]);
+    g.restore();
+
+    sphere(X,Y,r,proton,id);
+
+    // Réticule en trois arcs qui vient se verrouiller autour de la sphère.
+    g.save();g.globalAlpha=u;
+    const ring=r+5+(1-u)*7;
+    g.strokeStyle=accent;g.lineWidth=1.35;
+    for(let k=0;k<3;k++){
+      const angle=k*2*Math.PI/3+u*.65;
+      g.beginPath();g.arc(X,Y,ring,angle,angle+1.25);g.stroke();
+    }
+    if(u>.60){
+      g.globalAlpha=(u-.60)/.40;
+      const wide=w>=470;
+      const boxW=Math.min(w-12,wide?185:118);
+      const boxH=wide?52:38;
+      const left=Math.max(6,Math.min(w-boxW-6,X-boxW*.55));
+      const top=Math.min(h-boxH-5,Y+ring+12);
+      g.fillStyle='#091725ed';g.fillRect(left,top,boxW,boxH);
+      g.fillStyle=accent;g.fillRect(left,top,2,boxH);
+      g.font=(wide?'bold 13px':'bold 10px')+' Consolas,monospace';
+      g.fillText(proton?'PROTON':'NEUTRON',left+9,top+(wide?18:14));
+      g.fillStyle='#c5d5de';
+      g.font=(wide?'11px':'10px')+' Consolas,monospace';
+      g.fillText(proton?'Charge : +1 e':'Charge : 0',left+9,top+(wide?34:29));
+      if(wide){
+        g.fillStyle='#81a4b6';g.font='9px Consolas,monospace';
+        g.fillText('CLIC SUR LA SPHÈRE / RETOUR',left+9,top+46);
+      }
+    }
+    g.restore();
+    if(d.returning && d.progress===0)atomDetach=null;
   }
   atomArea={cx,cy,core:unit*(.60+Math.cbrt(balls.length)*.32),hits:hitCells};
   if(big){
