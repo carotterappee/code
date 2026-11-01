@@ -177,7 +177,7 @@ function plot(){
   const g=canvas.getContext('2d');g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,w,h);
   g.font='11px Consolas,monospace';g.fillStyle='#8ca2ad';
   const sorted=[...bars.entries()].sort((a,b)=>a[0]-b[0]);
-  if(!sorted.length){g.fillText('En attente des bougies Kraken…',16,32);return}
+  if(!sorted.length){g.fillText('En attente des cotations…',16,32);return}
   const n=Math.min(70,Math.max(20,Math.floor((w-85)/9)));
   const end=sorted[sorted.length-1][0],begin=end-(n-1)*60000;
   const list=sorted.filter(([ts])=>ts>=begin);
@@ -226,6 +226,7 @@ function render(){
 }
 const refresh=setInterval(()=>{if(dirty)render()},150);
 const watch=setInterval(()=>{
+  if(currentMarket)return;
   const last=trades[0];
   $('age').textContent=last?'Dernière transaction · '+paris.format(new Date(last.timestamp))+
     ' · il y a '+Math.max(0,Math.floor((Date.now()-Date.parse(last.timestamp))/1000))+' s':'En attente des transactions';
@@ -233,7 +234,7 @@ const watch=setInterval(()=>{
     status('FLUX SILENCIEUX · RECONNEXION…');ws.close();
   }
 },1000);
-const observer=new ResizeObserver(()=>{dirty=true});observer.observe($('chart'));
+const observer=new ResizeObserver(()=>{if(currentMarket)plot();else dirty=true});observer.observe($('chart'));
 function closeView(){parent.postMessage('spectre:close-market',location.origin)}
 $('exit').onclick=closeView;
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeView()}});
@@ -261,31 +262,111 @@ markets.forEach(([group,name],i)=>{
 });
 const titleBar=document.querySelector('header small');
 let currentMarket=0;
-function showMarket(index){
-  clearHolo();
-  currentMarket=index;
-  const [,name,code,detail]=markets[index];
-  $('global-widget').replaceChildren();
-  crypto.hidden=!!code;external.hidden=!code;
-  titleBar.textContent=code?'COTATIONS / TRADINGVIEW':'KRAKEN · SPOT';
-  if(!code){active=true;selectPair(pair);return}
-  active=false;disconnect();
-  $('global-heading').textContent=name+'  /  '+code;
-  $('global-detail').textContent=detail;
-  const link='https://www.tradingview.com/symbols/'+code.replace(':','-')+'/';
-  $('global-source').href=link;
-  const wrap=document.createElement('div');wrap.className='tradingview-widget-container';
-  wrap.style.height='100%';
-  const slot=document.createElement('div');slot.className='tradingview-widget-container__widget';
-  const js=document.createElement('script');
-  js.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-  js.async=true;
-  js.textContent=JSON.stringify({autosize:true,symbol:code,interval:'60',timezone:'Europe/Paris',
-    theme:'dark',style:'1',locale:'fr',allow_symbol_change:false,hide_side_toolbar:true,
-    withdateranges:true,calendar:false,save_image:false,backgroundColor:'#0e171e'});
-  js.onerror=()=>{slot.textContent='Lecteur indisponible. Ouvre la fiche de l’instrument ci-dessous.'};
-  wrap.append(slot,js);$('global-widget').append(wrap);
+
+const exchangeInstruments={
+  'EURONEXT:PX1':['^FCHI','points','points d’indice',''],
+  'EURONEXT:TTE':['TTE.PA','EUR','euros par action','actions'],
+  'AMEX:SPY':['SPY','USD','dollars par part','parts'],
+  'NASDAQ:AAPL':['AAPL','USD','dollars par action','actions'],
+  'TVC:UKOIL':['BZ=F','USD/baril','dollars par baril de Brent','contrats'],
+  'TVC:GOLD':['GC=F','USD/oz t','dollars par once troy d’or','contrats'],
+  'AMEX:XLE':['XLE','USD','dollars par part','parts'],
+  'AMEX:LIT':['LIT','USD','dollars par part','parts']
+};
+const exchangeLabels=['OUVERTURE','CLÔTURE PRÉC.','ÉCART SÉANCE','HAUT SÉANCE','BAS SÉANCE','VOLUME SÉANCE'];
+const cryptoButtons=[...document.querySelectorAll('#pairs button')];
+const marketChartTitle=document.querySelector('#crypto-market section .panelhead');
+const marketTableTitle=document.querySelector('#crypto-market aside .panelhead');
+const marketHeaders=[...document.querySelectorAll('#crypto-market th')];
+const unitNode=document.querySelector('.hero .muted');
+const sourceNode=document.querySelector('#crypto-market footer span:last-child');
+let exchangeData=null,exchangeTimer=0,exchangeRequest=null;
+
+function instrument(){return exchangeInstruments[markets[currentMarket][2]]}
+function marketUnit(){return currentMarket?instrument()[1]:'USD'}
+function marketValue(n){return Number.isFinite(n)?show(n,priceFmt)+' '+marketUnit():'indisponible'}
+function marketVolume(n){
+  if(!instrument()[3]||!Number.isFinite(n))return 'non communiqué';
+  return show(n,qtyFmt)+' '+instrument()[3];
 }
+function stamp(ts){
+  return new Intl.DateTimeFormat('fr-FR',{
+    timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'
+  }).format(ts);
+}
+function drawExchange(){
+  const d=exchangeData;
+  $('price').textContent=d?show(d.price,priceFmt):'—';
+  const diff=d&&Number.isFinite(d.previous)?d.price-d.previous:null;
+  const pct=diff!==null&&d.previous>0?diff/d.previous*100:null;
+  $('change').textContent=pct===null?'':(pct>0?'+':'')+show(pct)+' % / séance';
+  $('change').className=diff<0?'down':'up';
+  const numbers=d?[d.open,d.previous,diff,d.high,d.low,d.volume]:[];
+  values.forEach((b,i)=>{
+    b.textContent=i===5&&d?marketVolume(numbers[i]):show(numbers[i],priceFmt);
+  });
+  $('age').textContent=d?'Dernier cours reçu · '+stamp(d.time)+' (Paris)':'En attente du premier cours';
+  const fragment=document.createDocumentFragment();
+  for(const r of (d?.rows||[]).slice(-14).reverse()){
+    const tr=document.createElement('tr');tr.dataset.minute=r.ts;
+    for(const [i,text] of [paris.format(r.ts).slice(0,5),show(r.close,priceFmt),
+      instrument()[3]?show(r.volume,qtyFmt):'—'].entries()){
+      const td=document.createElement('td');td.textContent=text;
+      if(i===1)td.className=r.close>=r.open?'up':'down';
+      tr.append(td);
+    }
+    fragment.append(tr);
+  }
+  $('tape').replaceChildren(fragment);plot();
+}
+async function fetchExchange(index){
+  const request=new AbortController();exchangeRequest=request;
+  try{
+    const response=await fetch('/api/spectre-quotes?symbol='+encodeURIComponent(instrument()[0]),
+      {signal:request.signal});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const data=await response.json();
+    if(currentMarket!==index||request.signal.aborted)return;
+    if(!data.rows?.length||data.symbol!==instrument()[0])throw Error('Réponse inattendue');
+    exchangeData=data;bars=new Map(data.rows.map(r=>[r.ts,r]));
+    const seconds=Math.max(0,Math.floor((Date.now()-data.time)/1000));
+    status(seconds>=120?'DERNIER COURS · '+stamp(data.time):'COURS REÇU · '+paris.format(data.time));
+    drawExchange();
+  }catch(err){
+    if(request.signal.aborted||currentMarket!==index)return;
+    status(exchangeData?'SOURCE INDISPONIBLE · DERNIER COURS CONSERVÉ':'SOURCE INDISPONIBLE');
+  }finally{
+    if(!request.signal.aborted&&currentMarket===index)
+      exchangeTimer=setTimeout(()=>fetchExchange(index),30000);
+  }
+}
+function showMarket(index){
+  clearHolo();clearTimeout(exchangeTimer);exchangeRequest?.abort();exchangeRequest=null;
+  disconnect();dirty=false;currentMarket=index;exchangeData=null;
+  external.hidden=true;crypto.hidden=false;
+  cryptoButtons.forEach(b=>b.hidden=!!index);
+  document.querySelectorAll('.metric small').forEach((n,i)=>{
+    n.textContent=(index?exchangeLabels:labels)[i];
+  });
+  if(!index){
+    active=true;unitNode.textContent='USD';titleBar.textContent='KRAKEN · SPOT';
+    marketChartTitle.textContent='PRIX / USD · BOUGIES 1 MIN · VOLUME';
+    marketTableTitle.textContent='TRANSACTIONS · HEURE DE PARIS';
+    ['Heure','Prix USD','Quantité'].forEach((t,i)=>marketHeaders[i].textContent=t);
+    sourceNode.textContent='Source : Kraken WebSocket v2';
+    selectPair(pair);return;
+  }
+  active=false;bars=new Map();trades=[];ticker={};
+  const [symbol,unit]=instrument();
+  titleBar.textContent='COTATIONS / '+markets[index][0];
+  $('symbol').textContent=markets[index][1];unitNode.textContent=unit;
+  marketChartTitle.textContent='PRIX / '+unit+' · BOUGIES 1 MIN'+(instrument()[3]?' · VOLUME':'');
+  marketTableTitle.textContent='DERNIÈRES MINUTES · HEURE DE PARIS';
+  ['Heure','Cours','Volume'].forEach((t,i)=>marketHeaders[i].textContent=t);
+  sourceNode.textContent='Yahoo Finance · '+symbol+' · vérification toutes les 30 s';
+  status('CHARGEMENT…');drawExchange();fetchExchange(index);
+}
+window.addEventListener('pagehide',()=>{clearTimeout(exchangeTimer);exchangeRequest?.abort()});
 picker.onchange=()=>showMarket(Number(picker.value));
 
 const tip=$('market-holo'),cross=$('market-cross');
@@ -309,7 +390,7 @@ function explain(target,key,title,body,x,y){
   }
   placeTip(x,y);
 }
-const dollars=n=>Number.isFinite(n)?show(n,priceFmt)+' USD':'indisponible';
+const dollars=n=>marketValue(n);
 function tradeSummary(base){
   if(!trades.length)return 'En attente des premières transactions Kraken.';
   const sample=trades.slice(0,14);
@@ -335,7 +416,9 @@ function chartHolo(e){
   if(volume && my<volBottom-r.volume/maxVolume*height*.14){clearHolo();return}
   const time=paris.format(new Date(ts)).slice(0,5);
   const direction=r.close>r.open?'Hausse':r.close<r.open?'Baisse':'Prix inchangé';
-  const body=volume?
+  const body=volume&&currentMarket?
+    `Volume de cette minute : ${marketVolume(r.volume)}. La couleur suit la variation du prix pendant la minute.`:
+    volume?
     `${show(r.volume,qtyFmt)} ${base} échangés pendant cette minute. La hauteur mesure la quantité totale. La couleur suit le sens de la bougie, tous achats et ventes confondus.`:
     `${direction} entre le premier et le dernier échange de la minute.
 Ouverture : ${dollars(r.open)}
@@ -356,6 +439,54 @@ function inspect(e){
   const base=pair.split('/')[0],asset=fullNames[base];
   const lastPrice=trades[0]?.price??ticker.last;
   let title='',body='';
+
+  if(currentMarket){
+    const [,name,,detail]=markets[currentMarket],d=exchangeData;
+    const [symbol,unit,meaning]=instrument();
+    if(hit.matches('#symbol,#market-select')){title=name+' / '+symbol;body=detail}
+    else if(hit.matches('#price,.hero .muted')){
+      title='Dernier cours disponible';body=d?`${marketValue(d.price)}. L’unité est exprimée en ${meaning}. Heure du cours : ${stamp(d.time)} (Paris).`:'En attente d’une cotation.';
+    }else if(hit.id==='change'){
+      title='Variation de séance';body=d&&Number.isFinite(d.previous)?
+        `On compare ${marketValue(d.price)} à la clôture précédente de ${marketValue(d.previous)}. Le pourcentage est la différence divisée par cette clôture.`:'Clôture de référence indisponible.';
+    }else if(hit.classList.contains('metric')){
+      const i=[...$('stats').children].indexOf(hit);title=exchangeLabels[i];
+      const descriptions=[
+        'Premier prix de la première minute disponible de cette séance.',
+        'Dernière clôture de référence disponible.',
+        'Dernier prix moins clôture précédente, dans l’unité de cet instrument.',
+        'Plus haut observé dans les données de la séance affichée.',
+        'Plus bas observé dans les données de la séance affichée.',
+        instrument()[3]?'Somme des volumes renseignés sur les minutes de la séance.':'Un indice est calculé à partir de ses composants. Il n’a pas de volume propre négocié.'
+      ];
+      body=values[i].textContent+' · '+descriptions[i];
+    }else if(hit.matches('aside .panelhead')){
+      title='Dernières minutes · instantané';
+      const rows=d?.rows.slice(-14)||[];
+      if(!rows.length)body='En attente de cotations.';
+      else{
+        const a=rows[0],b=rows[rows.length-1];
+        body=`${rows.length} minutes cotées affichées, de ${paris.format(a.ts).slice(0,5)} à ${paris.format(b.ts).slice(0,5)}.
+Premier prix : ${marketValue(a.open)}
+Dernier prix : ${marketValue(b.close)}
+Chaque ligne regroupe les données d’une minute.`;
+      }
+    }else if(hit.matches('td')){
+      const r=d?.rows.find(v=>v.ts===Number(hit.parentElement.dataset.minute));
+      if(!r){clearHolo();return}
+      title='Minute de '+paris.format(r.ts).slice(0,5);
+      body=`Ouverture : ${marketValue(r.open)}\nPlus haut : ${marketValue(r.high)}\nPlus bas : ${marketValue(r.low)}\nDernier prix : ${marketValue(r.close)}\nVolume : ${marketVolume(r.volume)}.`;
+    }else if(hit.matches('th')){
+      title=hit.textContent;body=['Heure de début de la minute, à Paris.',
+        'Dernier cours disponible pour cette minute, en '+unit+'.',
+        'Quantité échangée pendant la minute, si la source la communique.'][hit.cellIndex];
+    }else if(hit.id==='age'||hit.id==='link'){
+      title='Fraîcheur du cours';body='Le terminal interroge la source toutes les 30 secondes. L’horodatage indique quand le prix a été observé. Hors séance ou en cas de retard, ce prix peut rester affiché longtemps.';
+    }else{
+      title='Lire les bougies';body='Chaque corps relie le premier au dernier prix de la minute. Les mèches montrent le plus haut et le plus bas. Vert : clôture supérieure ou égale à l’ouverture. Rouge : clôture inférieure.';
+    }
+    explain(hit,'',title,body,e.clientX,e.clientY);return;
+  }
   if(hit.matches('#pairs button,#symbol')){
     const b=hit.textContent.trim().split('/')[0];
     title=b+' / USD';body=`${b} désigne ${fullNames[b]}. USD est le dollar américain. Cette paire donne le nombre de dollars pour une unité de ${fullNames[b]}.`;
