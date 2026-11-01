@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SPECTRE / Market</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080e13;color:#dbe5eb;font:13px/1.45 Consolas,monospace;color-scheme:dark}
+header,nav,.panelhead,footer{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header{padding:16px 3vw;border-bottom:1px solid #25323c}
+header strong{letter-spacing:.16em}header small{color:#8dabb8}
+button{font:inherit;cursor:pointer;color:#bdd1da;background:#101b22;border:1px solid #30424c;padding:6px 11px}
+button:focus-visible,button:hover{border-color:#8cd5cc}
+button[aria-pressed=true]{background:#10302e;border-color:#49ab9d;color:#abf5de}
+#exit{margin-left:auto}
+main{max-width:1600px;margin:auto;padding:18px 3vw}
+nav{margin-bottom:15px}#link{margin-left:auto;font-size:11px;color:#e9c478}
+#link[data-live=true]{color:#72dbb7}
+section,aside{background:#0e171e;border:1px solid #26343e}
+.hero{display:flex;align-items:baseline;gap:15px;flex-wrap:wrap;padding:18px}
+#price{font-size:clamp(26px,4vw,52px);letter-spacing:-.05em}
+label,.muted,.panelhead,footer{color:#91a6b1}
+#stats{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid #25323c}
+.metric{padding:9px 12px;border-right:1px solid #23313a}
+.metric small,.metric b{display:block}.metric small{font-size:10px;color:#91a6b1}.metric b{margin-top:4px}
+.layout{display:grid;grid-template-columns:minmax(0,2.5fr) minmax(260px,1fr);gap:10px;margin-top:10px}
+.panelhead{padding:9px 12px;border-bottom:1px solid #25323c;font-size:11px;letter-spacing:.06em}
+canvas{display:block;width:100%;height:clamp(270px,47vh,520px)}
+table{border-collapse:collapse;width:100%;font-size:12px}td,th{text-align:right;padding:4px 10px}
+th{color:#91a6b1;font-weight:400}td:first-child,th:first-child{text-align:left}
+.up{color:#68dfb2}.down{color:#ff8990}
+footer{padding:10px 1px;font-size:11px;justify-content:space-between}
+@media(max-width:800px){.layout{grid-template-columns:1fr}#stats{grid-template-columns:repeat(3,1fr)}}
+</style></head>
+<body>
+<header><strong>SPECTRE / MARKET</strong><small>KRAKEN · SPOT</small><button id="exit">← RETOUR</button></header>
+<main>
+<nav id="pairs"><span id="link" role="status">CONNEXION…</span></nav>
+<section><div class="hero"><label id="symbol"></label><strong id="price">—</strong>
+<span class="muted">USD</span><b id="change"></b></div><div id="stats"></div></section>
+<div class="layout"><section><div class="panelhead">PRIX / USD · BOUGIES 1 MIN · VOLUME</div>
+<canvas id="chart" aria-label="Chandeliers de prix et volumes échangés par minute"></canvas></section>
+<aside><div class="panelhead">TRANSACTIONS · HEURE DE PARIS</div>
+<table><thead><tr><th>Heure</th><th>Prix USD</th><th>Quantité</th></tr></thead><tbody id="tape"></tbody></table></aside></div>
+<footer><span id="age">En attente des transactions</span><span>Source : Kraken WebSocket v2</span></footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const pairs=['BTC/USD','ETH/USD','SOL/USD'];
+const fmt=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2});
+const priceFmt=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const qtyFmt=new Intl.NumberFormat('fr-FR',{maximumSignificantDigits:6});
+const paris=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const show=(n,f=fmt)=>Number.isFinite(n)?f.format(n):'—';
+let pair=pairs[0],ws=null,retry=0,delay=1000,active=true,lastPacket=0;
+let ticker={},trades=[],bars=new Map(),dirty=true,connected=false;
+const subscriptions=new Set();
+const labels=['ACHAT / BID','VENTE / ASK','ÉCART USD','HAUT 24 H','BAS 24 H','VOLUME 24 H'];
+const values=labels.map(s=>{
+  const div=document.createElement('div');div.className='metric';
+  const small=document.createElement('small');small.textContent=s;
+  const b=document.createElement('b');b.textContent='—';div.append(small,b);$('stats').append(div);return b;
+});
+function status(msg,live=false){$('link').textContent=msg;$('link').dataset.live=String(live)}
+function disconnect(){
+  clearTimeout(retry);
+  if(ws){const old=ws;ws=null;old.onclose=old.onmessage=old.onopen=old.onerror=null;old.close()}
+  connected=false;
+}
+function connect(){
+  disconnect();if(!active)return;
+  status('CONNEXION…');subscriptions.clear();lastPacket=Date.now();
+  const socket=ws=new WebSocket('wss://ws.kraken.com/v2');
+  socket.onopen=()=>{
+    for(const channel of ['trade','ticker','ohlc']){
+      const params={channel,symbol:[pair],snapshot:true};
+      if(channel==='ticker')params.event_trigger='bbo';
+      if(channel==='ohlc')params.interval=1;
+      socket.send(JSON.stringify({method:'subscribe',params}));
+    }
+  };
+  socket.onmessage=e=>{
+    if(socket!==ws)return;
+    lastPacket=Date.now();
+    const m=JSON.parse(e.data);
+    if(m.success===false){status('ABONNEMENT REFUSÉ · '+(m.error||pair));return}
+    if(m.method==='subscribe'&&m.success){
+      subscriptions.add(m.result.channel);
+      if(subscriptions.size===3){connected=true;delay=1000;status('● FLUX CONNECTÉ',true)}
+    }
+    if(!Array.isArray(m.data))return;
+    const rows=m.data.filter(r=>r.symbol===pair);
+    if(!rows.length)return;
+    if(m.channel==='trade'){
+      const byId=new Map((m.type==='snapshot'?[]:trades).map(r=>[r.trade_id,r]));
+      for(const r of rows)byId.set(r.trade_id,r);
+      trades=[...byId.values()].sort((a,b)=>b.trade_id-a.trade_id).slice(0,30);
+    }
+    if(m.channel==='ticker')ticker={...ticker,...rows[rows.length-1]};
+    if(m.channel==='ohlc'){
+      if(m.type==='snapshot')bars.clear();
+      for(const r of rows){
+        const ts=Date.parse(r.interval_begin);
+        if(Number.isFinite(ts))bars.set(ts,r);
+      }
+      if(bars.size>150){
+        const keys=[...bars.keys()].sort((a,b)=>a-b);
+        keys.slice(0,-120).forEach(k=>bars.delete(k));
+      }
+    }
+    dirty=true;
+  };
+  socket.onerror=()=>socket.close();
+  socket.onclose=()=>{
+    if(socket!==ws||!active)return;
+    connected=false;status('FLUX COUPÉ · RECONNEXION…');
+    retry=setTimeout(connect,delay);delay=Math.min(delay*2,15000);
+  };
+}
+function selectPair(p){
+  pair=p;ticker={};trades=[];bars.clear();dirty=true;delay=1000;
+  $('symbol').textContent=p;
+  [...$('pairs').querySelectorAll('button')].forEach(b=>b.setAttribute('aria-pressed',String(b.textContent===p)));
+  render();connect();
+}
+for(const p of pairs){
+  const b=document.createElement('button');b.textContent=p;b.onclick=()=>selectPair(p);
+  $('pairs').insertBefore(b,$('link'));
+}
+function plot(){
+  const canvas=$('chart'),w=canvas.clientWidth,h=canvas.clientHeight;
+  if(!w||!h)return;
+  const d=Math.min(devicePixelRatio||1,2);
+  if(canvas.width!==Math.round(w*d)||canvas.height!==Math.round(h*d)){
+    canvas.width=Math.round(w*d);canvas.height=Math.round(h*d);
+  }
+  const g=canvas.getContext('2d');g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,w,h);
+  g.font='11px Consolas,monospace';g.fillStyle='#8ca2ad';
+  const sorted=[...bars.entries()].sort((a,b)=>a[0]-b[0]);
+  if(!sorted.length){g.fillText('En attente des bougies Kraken…',16,32);return}
+  const n=Math.min(70,Math.max(20,Math.floor((w-85)/9)));
+  const end=sorted[sorted.length-1][0],begin=end-(n-1)*60000;
+  const list=sorted.filter(([ts])=>ts>=begin);
+  const left=10,right=w-78,top=17,bottom=h*.73;
+  const lo=Math.min(...list.map(([,r])=>r.low)),hi=Math.max(...list.map(([,r])=>r.high));
+  const pad=Math.max((hi-lo)*.08,hi*.00002,.001);
+  const y=v=>bottom-(v-lo+pad)/(hi-lo+2*pad)*(bottom-top);
+  const slot=(right-left)/n,x=ts=>left+((ts-begin)/60000+.5)*slot;
+  for(let j=0;j<5;j++){
+    const v=lo-pad+(hi-lo+2*pad)*j/4,Y=y(v);
+    g.strokeStyle='#24323a';g.beginPath();g.moveTo(left,Y);g.lineTo(right,Y);g.stroke();
+    g.fillStyle='#9aaeaf';g.fillText(show(v),right+5,Y+4);
+  }
+  const maxVol=Math.max(...list.map(([,r])=>r.volume),1e-12);
+  for(const [ts,r] of list){
+    const X=x(ts),cw=Math.max(2,slot*.65),col=r.close>=r.open?'#64dcb4':'#f47e89';
+    g.strokeStyle=col;g.fillStyle=col;g.beginPath();g.moveTo(X,y(r.high));g.lineTo(X,y(r.low));g.stroke();
+    g.fillRect(X-cw/2,Math.min(y(r.open),y(r.close)),cw,Math.max(1,Math.abs(y(r.open)-y(r.close))));
+    const vh=r.volume/maxVol*h*.14;g.globalAlpha=.55;g.fillRect(X-cw/2,h-23-vh,cw,vh);g.globalAlpha=1;
+  }
+  g.fillStyle='#9aaeaf';
+  for(const j of [0,Math.floor((n-1)/2),n-1]){
+    const ts=begin+j*60000;
+    g.fillText(paris.format(ts).slice(0,5),Math.min(right-33,Math.max(left,x(ts)-15)),h-6);
+  }
+}
+function render(){
+  dirty=false;
+  $('price').textContent=show(trades[0]?.price??ticker.last,priceFmt);
+  const pct=ticker.change_pct;
+  $('change').textContent=Number.isFinite(pct)?(pct>0?'+':'')+show(pct)+' % / 24 h':'';
+  $('change').className=pct>=0?'up':'down';
+  [ticker.bid,ticker.ask,ticker.ask-ticker.bid,ticker.high,ticker.low,ticker.volume]
+    .forEach((n,i)=>values[i].textContent=show(n)+(i===5&&Number.isFinite(n)?' '+pair.split('/')[0]:''));
+  const frag=document.createDocumentFragment();
+  for(const r of trades.slice(0,14)){
+    const tr=document.createElement('tr');
+    for(const [i,s] of [paris.format(new Date(r.timestamp)),show(r.price,priceFmt),show(r.qty,qtyFmt)].entries()){
+      const td=document.createElement('td');td.textContent=s;
+      if(i===1)td.className=r.side==='buy'?'up':'down';tr.append(td);
+    }
+    frag.append(tr);
+  }
+  $('tape').replaceChildren(frag);plot();
+}
+const refresh=setInterval(()=>{if(dirty)render()},150);
+const watch=setInterval(()=>{
+  const last=trades[0];
+  $('age').textContent=last?'Dernière transaction · '+paris.format(new Date(last.timestamp))+
+    ' · il y a '+Math.max(0,Math.floor((Date.now()-Date.parse(last.timestamp))/1000))+' s':'En attente des transactions';
+  if(ws && (ws.readyState===0||ws.readyState===1) && Date.now()-lastPacket>20000){
+    status('FLUX SILENCIEUX · RECONNEXION…');ws.close();
+  }
+},1000);
+const observer=new ResizeObserver(()=>{dirty=true});observer.observe($('chart'));
+function closeView(){parent.postMessage('spectre:close-market',location.origin)}
+$('exit').onclick=closeView;
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeView()}});
+window.addEventListener('pagehide',()=>{active=false;disconnect();clearInterval(refresh);clearInterval(watch);observer.disconnect()});
+selectPair(pair);
+</script></body></html>

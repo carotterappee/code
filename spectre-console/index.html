@@ -1578,6 +1578,10 @@ requestAnimationFrame(render);
 }
 </style>
 
+
+<iframe id="spectre-market" title="SPECTRE Market"
+ style="position:fixed;inset:0;width:100%;height:100%;border:0;z-index:45;background:#091015"
+ hidden></iframe>
 <div id="clow-port" role="dialog" aria-modal="true" aria-label="Saisie de commande" hidden>
   <form autocomplete="off">
     <label for="clow-input">exec &gt;</label>
@@ -2076,6 +2080,16 @@ requestAnimationFrame(render);
     e.preventDefault();
     if (state !== 'clow-entry') return;
 
+
+    if (portInput.value.trim().toLowerCase() === 'market') {
+      port.hidden=true;
+      state='market';
+      const frame=document.getElementById('spectre-market');
+      frame.hidden=false;
+      frame.src='./market.html';
+      frame.focus();
+      return;
+    }
     if (portInput.value.trim().toLowerCase() === 'clow') {
       runClow();
     } else {
@@ -2089,6 +2103,19 @@ requestAnimationFrame(render);
   });
 
 
+
+  function closeMarket(){
+    const frame=document.getElementById('spectre-market');
+    frame.hidden=true;
+    frame.removeAttribute('src');
+    state='stream';
+    prism.focus({preventScroll:true});
+  }
+  window.addEventListener('message',e=>{
+    const frame=document.getElementById('spectre-market');
+    if(state==='market' && e.origin===location.origin &&
+       e.source===frame.contentWindow && e.data==='spectre:close-market')closeMarket();
+  });
   function enterStream() {
     buildStream();
     prism.hidden = false;
@@ -2172,6 +2199,11 @@ requestAnimationFrame(render);
 
 
 
+
+    if(state==='market'){
+      if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeMarket()}
+      return;
+    }
     const portShortcut = e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey &&
                          (e.code === 'KeyP' || e.key.toLowerCase() === 'p');
     if (state === 'stream' && portShortcut) {
