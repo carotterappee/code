@@ -1253,6 +1253,8 @@ pcbCanvas.onkeydown=e=>{
 };
 
 function floorPlan(g,w,h,t){
+  if(spectrePCB3D){spectrePCB3D(g,w,h);return}
+
   const scale=Math.min(w/276,h/170);
   const x=(w-260*scale)/2,y=(h-154*scale)/2;
   pcbView={x,y,scale};
@@ -1330,6 +1332,16 @@ function floorPlan(g,w,h,t){
   g.font='6px monospace';g.fillStyle='#ccdbbc';g.fillText('SPECTRE   PCB–04   REV.B',59,15);
   g.restore();
 }
+
+let spectrePCB3D=null;
+function startSpectrePCB(){
+  import('./pcb-3d.js').then(({mountBoard})=>{
+    spectrePCB3D=mountBoard(pcbCanvas,pcbInfo);
+    pcbInfo.children[1].textContent='Glisse pour tourner · molette pour zoomer';
+  }).catch(err=>console.warn('Carte 2D active :',err));
+}
+startSpectrePCB();
+
 const screens=[[$('orbit'),globe],[$('plan'),floorPlan]];
 let last=0;
 function render(ms) {
