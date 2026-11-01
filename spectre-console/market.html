@@ -55,6 +55,15 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 #global-widget .tradingview-widget-container__widget{height:100%}
 #chart{cursor:crosshair}
 .metric,#symbol,#price,#change,aside .panelhead,td{cursor:help}
+
+#fr-housing-source {
+  display:flex; flex-wrap:wrap; align-items:center; gap:5px 14px;
+  padding:8px 12px; margin:0 0 12px; border-left:2px solid #5aaf9e;
+  background:#0e1e22; font-size:11px;
+}
+#fr-housing-source[hidden] { display:none }
+#fr-housing-source span { color:#94b9b7; font-size:10px; letter-spacing:.06em }
+#fr-housing-source a { color:#a7e8d7 }
 </style></head>
 <body>
 <header><strong>SPECTRE / MARKET</strong><small>KRAKEN · SPOT</small><button id="exit">← RETOUR</button></header>
@@ -63,6 +72,14 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 <div id="universe">
  <label for="market-select">EXPLORATEUR DE MARCHÉS</label>
  <select id="market-select" aria-label="Choisir un marché"></select>
+</div>
+
+<div id="fr-housing-source" hidden>
+  <span>PRIX DES LOGEMENTS · FRANCE MÉTROPOLITAINE</span>
+  <a href="https://www.insee.fr/fr/statistiques/serie/010567059"
+     target="_blank" rel="noopener noreferrer">
+    Indice trimestriel Notaires–Insee des logements anciens ↗
+  </a>
 </div>
 <section id="global-market" hidden>
  <h2 id="global-heading"></h2><p id="global-detail"></p>
@@ -244,7 +261,17 @@ const fullNames={BTC:'bitcoin',ETH:'ether',SOL:'solana'};
 const markets=[
  ['CRYPTO','Crypto · Kraken','', 'Transactions au comptant sur Kraken.'],
  ['FRANCE','CAC 40','EURONEXT:PX1','Indice de grandes sociétés cotées à Paris. Sa valeur se lit en points.'],
- ['FRANCE','TotalEnergies','EURONEXT:TTE','Action de TotalEnergies à Paris. Le prix correspond à une action, en euros.'],
+ ["France · Immobilier", "Gecina", "EURONEXT:GFC", "Foncière présente dans les bureaux et le logement, notamment en région parisienne. Le cours affiché est le prix d’une action Gecina."],
+ ["France · Immobilier", "Klépierre", "EURONEXT:LI", "Foncière spécialisée dans les centres commerciaux européens. Le graphique suit son action cotée à Paris."],
+ ["France · Immobilier", "Nexity", "EURONEXT:NXI", "Entreprise française de promotion immobilière. Son action permet de suivre la valorisation du promoteur en Bourse."],
+ ["France · Énergie", "TotalEnergies", "EURONEXT:TTE", "Groupe actif dans le pétrole, le gaz et l’électricité. Le cours indique le prix d’une action TotalEnergies en euros."],
+ ["France · Énergie", "Engie", "EURONEXT:ENGI", "Groupe énergétique actif notamment dans l’électricité, les renouvelables et les infrastructures gazières. La valeur affichée est celle d’une action."],
+ ["France · Défense et aéronautique", "Thales", "EURONEXT:HO", "Groupe technologique actif dans la défense, l’aéronautique et la cybersécurité. Le cours reflète l’ensemble de ses activités."],
+ ["France · Défense et aéronautique", "Dassault Aviation", "EURONEXT:AM", "Constructeur des avions militaires Rafale et des avions d’affaires Falcon. Le prix correspond à une action Dassault Aviation."],
+ ["France · Défense et aéronautique", "Safran", "EURONEXT:SAF", "Équipementier de l’aéronautique, de la défense et de l’espace, notamment dans les moteurs d’avion. Son activité comprend aussi l’aviation civile."],
+ ["France · Hôtellerie", "Accor", "EURONEXT:AC", "Groupe hôtelier exploitant notamment les marques ibis, Novotel et Sofitel. Le chiffre affiché est le cours de l’action Accor en euros."],
+ ["France · Construction et infrastructures", "Vinci", "EURONEXT:DG", "Groupe actif dans la construction et les concessions, notamment les autoroutes et les aéroports. Le graphique suit son action."],
+ ["France · Construction et infrastructures", "Saint-Gobain", "EURONEXT:SGO", "Groupe de matériaux et de solutions pour la construction et la rénovation. Le graphique suit le prix d’une action en euros."],
  ['ÉTATS-UNIS','S&P 500 · fonds SPY','AMEX:SPY','SPY est un fonds coté qui suit le S&P 500. Le prix affiché est celui d’une part, en dollars.'],
  ['ÉTATS-UNIS','Apple','NASDAQ:AAPL','Action Apple cotée au Nasdaq. Son prix se lit en dollars par action.'],
  ['MATIÈRES PREMIÈRES','Pétrole Brent','TVC:UKOIL','Indicateur du prix du Brent, exprimé en dollars par baril. La source et le contrat de référence comptent quand on compare deux cours.'],
@@ -264,6 +291,16 @@ const titleBar=document.querySelector('header small');
 let currentMarket=0;
 
 const exchangeInstruments={
+  "EURONEXT:GFC":["GFC.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:LI":["LI.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:NXI":["NXI.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:ENGI":["ENGI.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:HO":["HO.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:AM":["AM.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:SAF":["SAF.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:AC":["AC.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:DG":["DG.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:SGO":["SGO.PA", "EUR", "euros par action", "actions"],
   'EURONEXT:PX1':['^FCHI','points','points d’indice',''],
   'EURONEXT:TTE':['TTE.PA','EUR','euros par action','actions'],
   'AMEX:SPY':['SPY','USD','dollars par part','parts'],
@@ -341,6 +378,7 @@ async function fetchExchange(index){
   }
 }
 function showMarket(index){
+  $('fr-housing-source').hidden=markets[index][0]!=='France · Immobilier';
   clearHolo();clearTimeout(exchangeTimer);exchangeRequest?.abort();exchangeRequest=null;
   disconnect();dirty=false;currentMarket=index;exchangeData=null;
   external.hidden=true;crypto.hidden=false;
