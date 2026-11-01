@@ -88,91 +88,200 @@
     const s=document.createElement('select');s.style.cssText='display:block;width:100%;margin:4px 0 10px';
     box.append(s);return [box,s];
   }
+
+  // Règles communes à toutes les candidatures.
+  const branches = [
+    ['Énergie', /petrol|gaz naturel|carburant|hydrocarb|raffiner|energies? fossiles/,
+      'Examiner les taxes, les coûts de production et la part de l’activité réalisée en France. Le cours mondial du pétrole peut dominer une mesure nationale.'],
+    ['Électricité et services collectifs', /electric|nucleaire|renouvelable|tarif.*energie|reseau energetique|gestion de l eau/,
+      'Identifier qui supporte le coût : fournisseur, producteur, client ou budget public. Un tarif plafonné avec compensation et un plafond sans compensation ont des effets différents.'],
+    ['Industrie, défense et infrastructures', /industrie|industriel|defense|militaire|armement|aeronautique|ferroviaire|infrastructure|commande publique/,
+      'Un crédit budgétaire peut ouvrir des débouchés. Pour estimer le bénéfice, il faut ensuite connaître les contrats signés, les fournisseurs retenus et leurs marges.'],
+    ['Banques et assurances', /banqu|assurance|credit immobilier|credit bancaire|solvabilite|transactions financieres/,
+      'Examiner séparément la marge sur les crédits, le coût des dépôts, les défauts de paiement et la valeur du portefeuille obligataire. Ces effets peuvent se compenser.'],
+    ['Immobilier coté', /logement|loyer|foncier|immobili|renovation thermique/,
+      'Les promoteurs dépendent des réservations et des chantiers. Les foncières dépendent surtout des loyers, du taux d’occupation et du refinancement.'],
+    ['Consommation, luxe et tourisme', /pouvoir d achat|touris|hotel|automobil|vehicule|luxe|consommation des menages/,
+      'Distinguer la demande des ménages français de celle des clients étrangers. Un groupe coté à Paris peut réaliser une grande partie de ses ventes hors de France.'],
+    ['Alimentation et consommation courante', /aliment|agric|grande distribution|premiere necessite/,
+      'Suivre la répartition des coûts entre agriculteurs, industriels, distributeurs et consommateurs. Une hausse des prix de vente ne garantit pas une hausse des bénéfices.'],
+    ['Santé et pharmacie', /sante|pharma|medicament|hospital|hopit|assurance maladie/,
+      'Regarder les tarifs de remboursement, les volumes et les marchés hospitaliers. Les ventes internationales peuvent limiter l’exposition à une décision française.'],
+    ['Technologies', /numerique|logiciel|semi conducteur|intelligence artificielle|cyber|centre de donnees/,
+      'Faire la différence entre commandes nouvelles, subventions et coûts réglementaires. Le lieu de cotation ne détermine pas la nationalité du fournisseur retenu.'],
+    ['Télécommunications', /telecom|telephonie|fibre optique|haut debit|frequences mobiles/,
+      'Les obligations de couverture peuvent favoriser les équipementiers et augmenter les investissements demandés aux opérateurs. Vérifier les conditions de financement.'],
+    ['Matières premières et matériaux', /materiaux|minier|minerai|acier|siderurg|chimie|ciment|metaux/,
+      'Comparer prix de l’énergie, coût des intrants et débouchés industriels. Une taxe sur les importations peut protéger un producteur et pénaliser son client.']
+  ];
+  const transverse = /deficit public|dette publique|budget de l etat|impot sur les societes|cotisations patronales|droits? de douane/;
+  const fmt = n => n.toLocaleString('fr-FR',{maximumFractionDigits:2});
+
+  function el(tag,text,cls){
+    const e=document.createElement(tag);
+    if(text!==undefined)e.textContent=text;
+    if(cls)e.className=cls;
+    return e;
+  }
+  function fold(parent,title){
+    const d=el('details');
+    d.append(el('summary',title)); parent.append(d); return d;
+  }
+  function addMeasure(parent,m,db){
+    const title=(m.kind==='programme'?'Programme écrit':'Déclaration')+' · '+m.title;
+    const d=fold(parent,title);
+    d.append(el('p',m.detail),el('small','Dernière modification recensée : '+m.lastChanged));
+    for(const id of m.sourceIds||[]){
+      const s=db.sources[id];
+      if(!s)continue;
+      const p=el('p');
+      safeLink(p,s.publisher+' · '+s.title+(s.date?' · '+s.date:''),s.url);
+      d.append(p);
+    }
+  }
+
+  function renderProgrammeEntier(parent,c,db){
+    parent.replaceChildren();
+    const measures=(c.measures||[]).filter(m=>
+      m.status==='active' && ['programme','declaration'].includes(m.kind));
+    const texts=measures.map(m=>normal(m.title+' '+m.detail));
+    const classified=new Set();
+    const report=branches.map(([name,pattern,mechanism])=>{
+      const matched=[];
+      texts.forEach((text,i)=>{
+        if(pattern.test(text)){matched.push(measures[i]);classified.add(i)}
+      });
+      return {name,mechanism,matched};
+    });
+    const common=[];
+    texts.forEach((text,i)=>{
+      if(transverse.test(text)){common.push(measures[i]);classified.add(i)}
+    });
+    const written=measures.filter(m=>m.kind==='programme').length;
+    const exposed=report.filter(row=>row.matched.length);
+    const sorted=report.slice().sort((x,y)=>y.matched.length-x.matched.length);
+
+    parent.append(el('small','RAPPORT / FRANCE 2027','polit-kicker'),el('h3',name(c)));
+    para(parent,'Candidature :',c.party+' · '+(c.status==='officiel'?'officielle':'déclarée')+
+      ' · statut recensé le '+c.statusDate+'.');
+    if(c.programmeUrl)safeLink(parent,'Consulter le programme de campagne ↗',c.programmeUrl);
+    for(const id of (c.statusSourceIds||[]).slice(0,1)){
+      const source=db.sources[id];
+      if(source){parent.append('  ');safeLink(parent,'Source de la candidature ↗',source.url)}
+    }
+
+    parent.append(el('h4','01 / Synthèse automatique'));
+    para(parent,'Programme examiné :',`${written} mesure(s) de programme et ${measures.length-written} déclaration(s) active(s) dans la base.`);
+    para(parent,'Couverture :',`${exposed.length} secteurs sur ${branches.length} présentent au moins un lien détecté. ${classified.size} proposition(s) distincte(s) ont été rapprochées d’un secteur ou d’un mécanisme transversal.`);
+    if(exposed.length){
+      para(parent,'À examiner en premier :',sorted.filter(s=>s.matched.length).slice(0,3)
+        .map(s=>s.name+' ('+s.matched.length+' mesures associées)').join(' · ')+'.');
+      const first=sorted[0];
+      para(parent,'Exemple concret :','« '+first.matched[0].title+' » — '+first.mechanism);
+    }
+    para(parent,'Lecture du résultat :','Le classement mesure la présence des thèmes dans le corpus. Le coût d’une mesure, son adoption et son effet sur les bénéfices demandent une analyse distincte. Une même proposition peut toucher plusieurs secteurs.');
+
+    if(common.length){
+      const d=fold(parent,'Mesures transversales · fiscalité, budget et commerce ('+common.length+')');
+      d.append(el('p','Ces mesures peuvent toucher de nombreux titres à la fois. Vérifier l’assiette, les exemptions, le financement et les décisions européennes nécessaires.'));
+      common.forEach(m=>addMeasure(d,m,db));
+    }
+
+    parent.append(el('h4','02 / Scénarios par secteur'));
+    for(const row of sorted){
+      const d=fold(parent,row.name+' · '+row.matched.length+' mesure(s)');
+      if(!row.matched.length){
+        d.append(el('p','Aucun lien direct repéré par le moteur local. Une exposition indirecte reste possible via le crédit, la demande ou les impôts.'));
+        continue;
+      }
+      d.append(el('p',row.mechanism));
+      row.matched.forEach(m=>addMeasure(d,m,db));
+    }
+    const other=measures.filter((m,i)=>!classified.has(i));
+    if(other.length){
+      const d=fold(parent,'Autres propositions examinées ('+other.length+')');
+      d.append(el('p','Le moteur ne dispose pas de règle suffisamment précise pour en déduire un effet financier.'));
+      other.forEach(m=>addMeasure(d,m,db));
+    }
+
+    parent.append(el('h4','03 / Test de sensibilité'));
+    para(parent,'Hypothèse :','Choisis un secteur, son poids supposé dans un portefeuille et sa variation. Le reste du portefeuille est supposé stable.');
+    const controls=el('div',undefined,'polit-sim');
+    const sector=el('select');
+    for(const row of sorted)sector.add(new Option(row.name,row.name));
+    function field(label,control){
+      const l=el('label',label);l.append(control);controls.append(l);
+    }
+    field('Secteur',sector);
+    function numberField(label,min,max,initial){
+      const input=el('input');input.type='number';input.step='any';
+      input.min=min;if(max!==null)input.max=max;
+      input.value=initial;field(label,input);return input;
+    }
+    const weight=numberField('Poids supposé (%)',0,100,'8');
+    const shock=numberField('Variation supposée (%)',-100,null,'-5');
+    const result=el('div',undefined,'polit-result');result.setAttribute('aria-live','polite');
+    function calculate(){
+      const w=weight.valueAsNumber,s=shock.valueAsNumber;
+      if(!Number.isFinite(w)||!Number.isFinite(s)||!weight.validity.valid||!shock.validity.valid){
+        result.textContent='Poids attendu : de 0 à 100 %. Variation minimale : −100 %.';return;
+      }
+      const contribution=w*s/100;
+      result.textContent=sector.value+' · '+fmt(w)+' % × '+fmt(s)+' % = '+
+        (contribution>0?'+':'')+fmt(contribution)+' point(s) de variation du portefeuille.';
+    }
+    controls.oninput=calculate;sector.onchange=calculate;
+    parent.append(controls,result);calculate();
+    para(parent,'Portée :','Les valeurs préremplies illustrent le calcul. Ce sont des hypothèses modifiables. La pondération complète actuelle du CAC All-Share et la réaction future des cours ne sont pas connues de ce module.');
+    safeLink(parent,'Consulter le périmètre du CAC All-Share chez Euronext ↗',
+      'https://live.euronext.com/en/product/indices/qs0010989141-xpar');
+  }
+
   async function show(out,question,stillCurrent){
-    out.textContent='Lecture des candidatures et des mesures sourcées…';
+    out.textContent='Chargement des programmes…';
     let result;
     try{result=await load()}catch{
-      if(stillCurrent())out.textContent='Les données électorales sont indisponibles. Vérifie le dossier analyste.';
+      if(stillCurrent())out.textContent='La base électorale est indisponible.';
       return;
     }
     if(!stillCurrent())return;
-    const {db,mode}=result,q=normal(question);
+    const {db,mode}=result;
     const candidates=db.candidates.filter(c=>['declare','officiel'].includes(c.status))
       .sort((a,b)=>a.lastName.localeCompare(b.lastName,'fr'));
-    const themes=new Map(db.themes.map(t=>[t.key,t.name]));
-    const requested=channels.filter(ch=>ch.words.test(q));
     out.replaceChildren();
-    para(out,'Présidentielle française 2027',
-      mode+' · base PresiTracker2027 du '+db.updatedAt.slice(0,10)+'.');
-    const [cBox,cSelect]=selector('Candidature');
-    cSelect.add(new Option('Choisir une personne…',''));
-    for(const c of candidates)cSelect.add(new Option(name(c)+' · '+c.partyShort,c.id));
-    const [mBox,mSelect]=selector('Mesure à examiner');
-    mBox.hidden=true;
-    const summary=document.createElement('div'),detail=document.createElement('div');
-    out.append(cBox,summary,mBox,detail);
-    const footer=document.createElement('p');
-    safeLink(footer,'Données : PresiTracker2027 · Licence Ouverte 2.0',
-      'https://github.com/fcroiseaux/presitracker2027-data');
-    out.append(footer);
-
-    function renderCandidate(){
-      summary.replaceChildren();detail.replaceChildren();mSelect.replaceChildren();mBox.hidden=true;
-      const c=candidates.find(row=>row.id===cSelect.value);
-      if(!c)return;
-      para(summary,name(c),c.party+' · statut dans la base : '+
-        (c.status==='officiel'?'officiel':'candidature déclarée')+' depuis le '+c.statusDate+'.');
-      safeLink(summary,'Programme publié par la campagne ↗',c.programmeUrl);
-      for(const id of (c.statusSourceIds||[]).slice(0,2)){
-        const s=db.sources[id];if(s){summary.append(' ');safeLink(summary,'Source de candidature · '+s.publisher,s.url)}
-      }
-      const measures=(c.measures||[]).filter(m=>m.status==='active'&&
-        ['programme','declaration'].includes(m.kind));
-      const text=m=>normal(m.title+' '+m.detail);
-      const thematic=m=>requested.some(r=>r.words.test(text(m)));
-      if(requested.length)measures.sort((a,b)=>Number(thematic(b))-Number(thematic(a)));
-      if(!measures.length){
-        para(detail,'Programme','Aucune proposition active documentée dans cette base pour cette personne.');
-        return;
-      }
-      mBox.hidden=false;
-      mSelect.add(new Option('Choisir une proposition parmi '+measures.length+'…',''));
-      measures.forEach((m,i)=>mSelect.add(new Option(
-        (m.kind==='programme'?'Programme':'Déclaration')+' · '+m.title,i)));
-      function renderMeasure(){
-        detail.replaceChildren();
-        if(mSelect.value==='')return;
-        const m=measures[Number(mSelect.value)];
-        para(detail,'Mesure documentée ·',m.title);
-        para(detail,'Contenu ·',m.detail);
-        para(detail,'Nature ·',(m.kind==='programme'?'Programme écrit':'Déclaration publique')+
-          ' · rubrique '+(themes.get(m.themeKey)||m.themeKey)+' · mise à jour '+m.lastChanged+'.');
-        for(const id of m.sourceIds||[]){
-          const s=db.sources[id];if(!s)continue;
-          const p=document.createElement('p');
-          safeLink(p,s.publisher+' · '+s.title+(s.date?' · '+s.date:'')+' ↗',s.url);
-          detail.append(p);
-        }
-        const matched=channels.filter(ch=>ch.words.test(text(m)));
-        para(detail,'Scénario de marché ·',
-          'Hypothèse : victoire électorale, puis adoption et application de cette mesure. Une annonce, un vote budgétaire et un contrat exécuté sont trois étapes différentes.');
-        if(!matched.length){
-          para(detail,'Résultat ·','La base locale ne relie pas cette mesure à un mécanisme financier suffisamment précis. Direction et ampleur du mouvement indéterminées.');
-        }
-        for(const ch of matched){
-          para(detail,ch.title+' · France :',ch.fr);
-          para(detail,'Transmission internationale :',ch.world);
-          para(detail,'À vérifier :',ch.watch);
-        }
-        para(detail,'Ce qui peut inverser la réaction ·',
-          'Le marché réagit à la surprise par rapport aux attentes. Une mesure anticipée, amendée, reportée ou compensée peut produire une réaction faible ou de sens différent. Aucun pourcentage de chute n’est déduit du seul programme.');
-      }
-      mSelect.onchange=renderMeasure;
-      if(requested.length&&thematic(measures[0])){mSelect.value='0';renderMeasure()}
+    const root=el('div',undefined,'polit-root');out.append(root);
+    root.append(el('small','SPECTRE / PRÉSIDENTIELLE 2027','polit-kicker'),
+      el('h3','Choisir une candidature'));
+    const search=el('input');search.type='search';search.placeholder='Rechercher un nom ou un parti…';
+    search.setAttribute('aria-label','Rechercher une candidature');search.className='polit-search';
+    const cards=el('div',undefined,'polit-cards'),report=el('div');
+    root.append(search,cards,report);
+    const credit=el('p',mode+' · données du '+db.updatedAt.slice(0,10)+' · ');
+    safeLink(credit,'PresiTracker2027 / Licence Ouverte 2.0','https://github.com/fcroiseaux/presitracker2027-data');
+    root.append(credit);
+    function choose(c){
+      search.value=name(c);populate(c.id);
+      renderProgrammeEntier(report,c,db);
     }
-    cSelect.onchange=renderCandidate;
-    const found=candidates.filter(c=>(' '+q+' ').includes(' '+normal(c.lastName)+' '));
-    if(found.length===1){cSelect.value=found[0].id;renderCandidate()}
+    function populate(selected){
+      cards.replaceChildren();
+      const q=normal(search.value);
+      for(const c of candidates.filter(c=>normal(name(c)+' '+c.party+' '+c.partyShort).includes(q))){
+        const button=el('button');button.type='button';button.className='polit-card';
+        button.setAttribute('aria-pressed',String(c.id===selected));
+        button.append(el('i',(c.firstName[0]||'')+(c.lastName[0]||'')),
+          el('strong',name(c)),el('small',c.partyShort));
+        button.onclick=()=>choose(c);cards.append(button);
+      }
+      if(!cards.childElementCount)cards.append(el('small','Aucune candidature correspondante.'));
+    }
+    search.oninput=()=>{report.replaceChildren();populate(null)};
+    search.onkeydown=e=>{
+      if(e.key==='Enter'&&cards.querySelectorAll('button').length===1)cards.querySelector('button').click();
+    };
+    const q=' '+normal(question)+' ';
+    const found=candidates.filter(c=>q.includes(' '+normal(c.lastName)+' '));
+    if(found.length===1)choose(found[0]);else populate(null);
   }
   globalThis.SpectreElection={show};
 })();

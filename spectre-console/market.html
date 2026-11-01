@@ -171,6 +171,32 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 }
 </style>
 
+
+<style id="polit-auto-design">
+#la-output:has(.polit-root){white-space:normal;background:#0b181f;padding:12px;border-left:0}
+.polit-root{line-height:1.55;color:#d0dfdf}
+.polit-root h3{color:#ecf8f4;font:600 23px/1.2 system-ui,sans-serif;margin:9px 0}
+.polit-root h4{padding-top:14px;border-top:1px solid #30474c;color:#a6e8d4}
+.polit-kicker,.polit-root small{color:#89aba9}
+.polit-search{width:100%;box-sizing:border-box;margin:8px 0}
+.polit-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+ gap:6px;max-height:210px;overflow:auto;margin-bottom:12px}
+.polit-card{display:grid;grid-template-columns:27px 1fr;align-items:center;text-align:left;
+ gap:0 7px;padding:8px;border:1px solid #304c50;border-radius:6px;background:#142329}
+.polit-card i{grid-row:span 2;background:#224537;color:#a2e5ca;padding:5px 2px;text-align:center;font:11px monospace}
+.polit-card strong{font:600 12px system-ui,sans-serif;color:#e3efec}
+.polit-card small{font-size:10px}
+.polit-card:hover,.polit-card[aria-pressed=true]{border-color:#8ac6ae}
+.polit-root details{border-top:1px solid #293d42;padding:7px 0}
+.polit-root details details{margin-left:8px}
+.polit-root summary{cursor:pointer;color:#c0e0d6}
+.polit-sim{display:grid;gap:6px}
+.polit-sim label{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.polit-sim select{max-width:65%}
+.polit-sim input{width:76px}
+.polit-result{padding:10px;margin:10px 0;background:#173330;border-left:2px solid #7de0b7;color:#d0f5e5}
+</style>
+
 </head>
 <body>
 <header><strong>SPECTRE / MARKET</strong><small>KRAKEN · SPOT</small><button id="la-open" type="button">◇ ANALYSTE</button><button id="exit">← RETOUR</button></header>
