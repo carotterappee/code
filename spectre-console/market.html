@@ -64,6 +64,25 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 #fr-housing-source[hidden] { display:none }
 #fr-housing-source span { color:#94b9b7; font-size:10px; letter-spacing:.06em }
 #fr-housing-source a { color:#a7e8d7 }
+
+#sovereign-fr {padding:clamp(12px,2vw,25px)}
+#sovereign-fr[hidden]{display:none}
+#sovereign-fr h2,#sovereign-fr h3 {margin:0 0 8px}
+#sovereign-fr a {color:#9de5d5}
+.sov-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));gap:10px;margin:16px 0}
+.sov-card {position:relative;border:1px solid #30454b;background:#0b181e;padding:14px;min-width:0}
+.sov-card small,.sov-note {color:#9ab2b7;font-size:11px}
+.sov-value {display:block;color:#d5fff0;font-size:clamp(20px,2.4vw,34px);margin:6px 0}
+.sov-meter {position:relative;height:8px;margin:14px 0 8px;border-radius:5px;
+ background:linear-gradient(90deg,#427b72,#80a38c,#cbad72,#b66c66)}
+#sov-pin {position:absolute;top:-4px;width:3px;height:16px;background:#fff;box-shadow:0 0 7px #fff9}
+.sov-help {display:none;position:absolute;z-index:4;top:calc(100% - 6px);left:6px;right:6px;
+ background:#10282dfc;border:1px solid #508e8b;border-left:3px solid #8de6cf;
+ padding:9px 11px;color:#d6e9e4;font:12px/1.5 Consolas,monospace}
+.sov-card:hover .sov-help,.sov-card:focus .sov-help {display:block}
+#sov-invest {width:100%;max-width:720px}
+#sov-invest th,#sov-invest td {border-bottom:1px solid #22353c;padding:6px}
+.sov-sources {display:flex;flex-wrap:wrap;gap:8px 16px;font-size:11px;margin-top:15px}
 </style></head>
 <body>
 <header><strong>SPECTRE / MARKET</strong><small>KRAKEN · SPOT</small><button id="exit">← RETOUR</button></header>
@@ -86,6 +105,49 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
  <div id="global-widget"></div>
  <p id="global-delay">Source TradingView · fréquence selon l’instrument et les droits de diffusion.</p>
  <a id="global-source" target="_blank" rel="noopener noreferrer">Ouvrir la fiche de l’instrument ↗</a>
+</section>
+
+<section id="sovereign-fr" hidden>
+  <h2>France / Dette souveraine</h2>
+  <div class="sov-note" id="sov-status" role="status"></div>
+  <div class="sov-grid">
+    <article class="sov-card" tabindex="0">
+      <small>DETTE PUBLIQUE · MAASTRICHT</small>
+      <strong class="sov-value" id="sov-debt"></strong>
+      <span id="sov-ratio"></span>
+      <div class="sov-help">Encours brut consolidé de l’État, des administrations locales, de la Sécurité sociale et des autres administrations publiques. Le ratio rapporte cet encours au PIB.</div>
+    </article>
+    <article class="sov-card" tabindex="0">
+      <small>FRANCE · RENDEMENT À 10 ANS</small>
+      <strong class="sov-value" id="sov-rate"></strong>
+      <span id="sov-rate-date"></span>
+      <div class="sov-help">Moyenne mensuelle du rendement des obligations publiques françaises de référence à environ dix ans. Un rendement de marché diffère du coupon fixé à l’émission.</div>
+    </article>
+    <article class="sov-card" tabindex="0">
+      <small>BAROMÈTRE · ÉCART FRANCE–ALLEMAGNE</small>
+      <strong class="sov-value" id="sov-spread">—</strong>
+      <div class="sov-meter"><i id="sov-pin" hidden></i></div>
+      <span id="sov-rank"></span>
+      <div class="sov-help" id="sov-method">Écart en points de base = (taux français − taux allemand) × 100. Le curseur situe le mois observé parmi les mois comparables.</div>
+    </article>
+  </div>
+  <p class="sov-note">Repère quotidien AFT : TEC 10 à <b>4,93 % le 30/10/2026</b> ·
+    <a href="https://www.aft.gouv.fr/fr/tec-10-du-jour" target="_blank" rel="noopener">Consulter la dernière valeur quotidienne ↗</a>
+  </p>
+  <h3>Origine des investisseurs · une émission documentée</h3>
+  <p>OAT du 11 février 2026 · échéance mai 2057 · montant placé : <b>8 Md€</b>.</p>
+  <table id="sov-invest">
+    <thead><tr><th>Pays ou zone</th><th>Part</th><th>Montant estimé</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="sov-note">Montants calculés à partir des pourcentages arrondis publiés par l’AFT. La répartition décrit les acheteurs de cette émission lors de son placement. Les titres peuvent ensuite changer de mains.</p>
+  <div class="sov-sources">
+    <a href="https://www.insee.fr/fr/statistiques/2830301" target="_blank" rel="noopener">Insee · dette</a>
+    <a href="https://ec.europa.eu/eurostat/databrowser/view/gov_10q_ggdebt/default/table" target="_blank" rel="noopener">Eurostat · dette trimestrielle</a>
+    <a href="https://ec.europa.eu/eurostat/databrowser/view/irt_lt_mcby_m/default/table" target="_blank" rel="noopener">Eurostat · taux mensuels</a>
+    <a href="https://www.aft.gouv.fr/fr/publications/communiques-presse/11022026-lancement-loat-440-25-mai-2057" target="_blank" rel="noopener">AFT · répartition de l’émission</a>
+    <a href="https://www.aft.gouv.fr/fr/principaux-chiffres-dette" target="_blank" rel="noopener">AFT · détention résidents / non-résidents</a>
+  </div>
 </section>
 <div id="crypto-market">
 <nav id="pairs"><span id="link" role="status">CONNEXION…</span></nav>
@@ -280,6 +342,9 @@ const markets=[
  ['SECTEURS','Lithium et batteries · LIT','AMEX:LIT','LIT regroupe des entreprises de la chaîne du lithium et des batteries. La valeur affichée est le prix en dollars d’une part du fonds.']
 ];
 const picker=$('market-select'),external=$('global-market'),crypto=$('crypto-market');
+
+const sovereignIndex=markets.length;
+markets.push(['FRANCE','Dette publique & taux à 10 ans','FR:SOV','Dette publique et rendements souverains français.']);
 const groups=new Map();
 markets.forEach(([group,name],i)=>{
   if(!groups.has(group)){
@@ -377,7 +442,115 @@ async function fetchExchange(index){
       exchangeTimer=setTimeout(()=>fetchExchange(index),30000);
   }
 }
+
+let sovereignVisit=0;
+const sovereignFmt=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2});
+const sf=n=>sovereignFmt.format(n);
+const sovereignPanel=$('sovereign-fr');
+
+for(const [zone,share] of [
+  ['Royaume-Uni',28],['Autres pays européens hors zone euro',24],
+  ['Reste du monde',18],['Autres pays de la zone euro',16],
+  ['France',7],['Pays-Bas',7]
+]){
+  const tr=document.createElement('tr');
+  for(const text of [zone,share+' %','≈ '+sf(8000*share/100)+' M€']){
+    const td=document.createElement('td');td.textContent=text;tr.append(td);
+  }
+  $('sov-invest').tBodies[0].append(tr);
+}
+
+async function euroSeries(dataset,params){
+  const url=new URL('https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/'+dataset);
+  for(const [key,value] of Object.entries(params))url.searchParams.set(key,value);
+  const response=await fetch(url,{signal:AbortSignal.timeout(15000)});
+  if(!response.ok)throw Error('Eurostat HTTP '+response.status);
+  const j=await response.json(),t=j.id?.indexOf('time');
+  if(t==null||t<0||!j.value||j.size.some((n,i)=>i!==t&&n!==1))
+    throw Error('Série Eurostat indisponible ou ambiguë');
+  const index=j.dimension.time.category.index;
+  const dates=Array.isArray(index)?index.map((v,i)=>[v,i]):Object.entries(index);
+  return new Map(dates.filter(([,i])=>Number.isFinite(j.value[i]))
+    .sort(([a],[b])=>a.localeCompare(b)).map(([date,i])=>[date,j.value[i]]));
+}
+
+function openSovereign(visit){
+  clearTimeout(exchangeTimer);exchangeRequest?.abort();exchangeRequest=null;
+  active=false;disconnect();dirty=false;clearHolo();
+  currentMarket=sovereignIndex;external.hidden=true;crypto.hidden=true;
+  const housing=$('fr-housing-source');if(housing)housing.hidden=true;
+  sovereignPanel.hidden=false;titleBar.textContent='FRANCE · FINANCES PUBLIQUES';
+  $('sov-debt').textContent='3 595,5 Md€';
+  $('sov-ratio').textContent='119,0 % du PIB · 2026-T2 · repère Insee';
+  $('sov-rate').textContent='—';$('sov-rate-date').textContent='Chargement de la série mensuelle…';
+  $('sov-spread').textContent='—';$('sov-pin').hidden=true;
+  $('sov-rank').textContent='Comparaison en cours…';
+  $('sov-status').textContent='Recherche des dernières publications Eurostat…';
+
+  const debtParams={geo:'FR',sector:'S13',na_item:'GD',lastTimePeriod:'8'};
+  const rateParams={lastTimePeriod:'60'};
+  const debtTask=Promise.all([
+    euroSeries('gov_10q_ggdebt',{...debtParams,unit:'MIO_EUR'}),
+    euroSeries('gov_10q_ggdebt',{...debtParams,unit:'PC_GDP'})
+  ]).then(([debt,ratio])=>{
+    if(visit!==sovereignVisit)return;
+    const date=[...debt.keys()].filter(k=>ratio.has(k)).pop();
+    if(!date||date<'2026-Q2')throw Error('Série de dette incomplète');
+    $('sov-debt').textContent=sf(debt.get(date)/1000)+' Md€';
+    $('sov-ratio').textContent=sf(ratio.get(date))+' % du PIB · '+date.replace('Q','T')+' · Eurostat';
+  });
+
+  const frTask=euroSeries('irt_lt_mcby_m',{...rateParams,geo:'FR'}).then(fr=>{
+    if(!fr.size)throw Error('Taux français absent');
+    if(visit===sovereignVisit){
+      const [date,value]=[...fr].pop();
+      $('sov-rate').textContent=sf(value)+' %';
+      $('sov-rate-date').textContent='Moyenne mensuelle · '+date;
+    }
+    return fr;
+  }).catch(err=>{
+    if(visit===sovereignVisit)$('sov-rate-date').textContent='Série mensuelle indisponible · voir le TEC 10 ci-dessous.';
+    throw err;
+  });
+
+  const spreadTask=Promise.all([
+    frTask,euroSeries('irt_lt_mcby_m',{...rateParams,geo:'DE'})
+  ]).then(([fr,de])=>{
+    if(visit!==sovereignVisit)return;
+    const points=[...fr].filter(([date])=>de.has(date))
+      .map(([date,v])=>[date,Math.round((v-de.get(date))*100)]);
+    if(!points.length)throw Error('Aucun mois commun');
+    const [date,spread]=points[points.length-1];
+    $('sov-spread').textContent=(spread>0?'+':'')+sf(spread)+' pb';
+    const explanation=`${date} : France ${sf(fr.get(date))} %, Allemagne ${sf(de.get(date))} %. Un point de base vaut 0,01 point de pourcentage.`;
+    if(points.length<12){
+      $('sov-rank').textContent=date+' · historique insuffisant pour situer le niveau';
+      $('sov-method').textContent=explanation;return;
+    }
+    const below=points.filter(([,v])=>v<spread).length;
+    const equal=points.filter(([,v])=>v===spread).length;
+    const rank=Math.round(100*(below+equal/2)/points.length);
+    $('sov-pin').style.left=rank+'%';$('sov-pin').hidden=false;
+    $('sov-rank').textContent=`${date} · percentile ${rank}/100 sur ${points.length} mois`;
+    $('sov-method').textContent=explanation+
+      ` À gauche : écart historiquement faible. À droite : écart historiquement élevé. Les mois à égalité sont classés à mi-rang. Ce classement ne mesure pas une probabilité de perte.`;
+  }).catch(err=>{
+    if(visit===sovereignVisit)$('sov-rank').textContent='Comparaison indisponible.';
+    throw err;
+  });
+  Promise.allSettled([debtTask,spreadTask]).then(results=>{
+    if(visit!==sovereignVisit)return;
+    $('sov-status').textContent=results.every(r=>r.status==='fulfilled')
+      ?'Séries officielles chargées · les dates figurent sur chaque indicateur.'
+      :'Certaines séries sont indisponibles · les repères datés et les sources restent affichés.';
+  });
+}
+
 function showMarket(index){
+  const visit=++sovereignVisit;
+  if(index===sovereignIndex){openSovereign(visit);return}
+  sovereignPanel.hidden=true;
+
   $('fr-housing-source').hidden=markets[index][0]!=='France · Immobilier';
   clearHolo();clearTimeout(exchangeTimer);exchangeRequest?.abort();exchangeRequest=null;
   disconnect();dirty=false;currentMarket=index;exchangeData=null;
