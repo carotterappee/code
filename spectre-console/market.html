@@ -31,19 +31,57 @@ th{color:#91a6b1;font-weight:400}td:first-child,th:first-child{text-align:left}
 .up{color:#68dfb2}.down{color:#ff8990}
 footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 @media(max-width:800px){.layout{grid-template-columns:1fr}#stats{grid-template-columns:repeat(3,1fr)}}
+
+#universe{display:flex;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+#universe label{font-size:10px;letter-spacing:.12em}
+#universe select{max-width:100%;background:#101e27;color:#d2ebe9;border:1px solid #35545b;
+ padding:7px 10px;font:12px Consolas,monospace}
+#market-holo{position:fixed;z-index:20;pointer-events:none;width:min(310px,calc(100vw - 20px));
+ padding:12px 14px;border:1px solid #498d91;border-left:3px solid #91f4dc;
+ background:linear-gradient(115deg,#102c31fa,#0a1721fa);box-shadow:0 7px 24px #0008;
+ color:#c8d9dd;font:12px/1.48 Consolas,monospace}
+#market-holo:before{content:"";position:absolute;right:0;top:0;width:21px;height:3px;background:#83ebd8}
+#market-holo small{display:block;color:#7fb4ba;font-size:9px;letter-spacing:.14em}
+#market-holo strong{display:block;margin:5px 0;color:#c3ffed;font-size:14px}
+#market-holo p{margin:0;white-space:pre-line}
+#market-holo[hidden],#global-market[hidden],#crypto-market[hidden]{display:none}
+#market-chart-shell{position:relative}
+#market-cross{position:absolute;top:0;bottom:0;border-left:1px dashed #89cfc888;pointer-events:none}
+#global-market{padding:12px}
+#global-heading{font-size:18px;margin:0;color:#d9fff3}
+#global-detail,#global-delay{color:#abc1c9}
+#global-market a{color:#9ce8da}
+#global-widget{height:clamp(350px,62vh,720px);margin:12px 0}
+#global-widget .tradingview-widget-container__widget{height:100%}
+#chart{cursor:crosshair}
+.metric,#symbol,#price,#change,aside .panelhead,td{cursor:help}
 </style></head>
 <body>
 <header><strong>SPECTRE / MARKET</strong><small>KRAKEN · SPOT</small><button id="exit">← RETOUR</button></header>
 <main>
+
+<div id="universe">
+ <label for="market-select">EXPLORATEUR DE MARCHÉS</label>
+ <select id="market-select" aria-label="Choisir un marché"></select>
+</div>
+<section id="global-market" hidden>
+ <h2 id="global-heading"></h2><p id="global-detail"></p>
+ <div id="global-widget"></div>
+ <p id="global-delay">Source TradingView · fréquence selon l’instrument et les droits de diffusion.</p>
+ <a id="global-source" target="_blank" rel="noopener noreferrer">Ouvrir la fiche de l’instrument ↗</a>
+</section>
+<div id="crypto-market">
 <nav id="pairs"><span id="link" role="status">CONNEXION…</span></nav>
 <section><div class="hero"><label id="symbol"></label><strong id="price">—</strong>
 <span class="muted">USD</span><b id="change"></b></div><div id="stats"></div></section>
 <div class="layout"><section><div class="panelhead">PRIX / USD · BOUGIES 1 MIN · VOLUME</div>
-<canvas id="chart" aria-label="Chandeliers de prix et volumes échangés par minute"></canvas></section>
+<div id="market-chart-shell"><i id="market-cross" hidden></i><canvas id="chart" aria-label="Chandeliers de prix et volumes échangés par minute"></canvas></div></section>
 <aside><div class="panelhead">TRANSACTIONS · HEURE DE PARIS</div>
 <table><thead><tr><th>Heure</th><th>Prix USD</th><th>Quantité</th></tr></thead><tbody id="tape"></tbody></table></aside></div>
-<footer><span id="age">En attente des transactions</span><span>Source : Kraken WebSocket v2</span></footer>
-</main>
+<footer><span id="age">En attente des transactions</span><span>Source : Kraken WebSocket v2</span></footer></div>
+<aside id="market-holo" role="tooltip" hidden>
+ <small>SPECTRE / LECTURE DU MARCHÉ</small><strong></strong><p></p>
+</aside></main>
 <script>
 const $=id=>document.getElementById(id);
 const pairs=['BTC/USD','ETH/USD','SOL/USD'];
@@ -127,7 +165,9 @@ for(const p of pairs){
   const b=document.createElement('button');b.textContent=p;b.onclick=()=>selectPair(p);
   $('pairs').insertBefore(b,$('link'));
 }
+let hoverPlot=null;
 function plot(){
+  hoverPlot=null;
   const canvas=$('chart'),w=canvas.clientWidth,h=canvas.clientHeight;
   if(!w||!h)return;
   const d=Math.min(devicePixelRatio||1,2);
@@ -151,6 +191,7 @@ function plot(){
     g.strokeStyle='#24323a';g.beginPath();g.moveTo(left,Y);g.lineTo(right,Y);g.stroke();
     g.fillStyle='#9aaeaf';g.fillText(show(v),right+5,Y+4);
   }
+  hoverPlot={list,begin,slot,left,right,bottom,volBottom:h-23,height:h};
   const maxVol=Math.max(...list.map(([,r])=>r.volume),1e-12);
   for(const [ts,r] of list){
     const X=x(ts),cw=Math.max(2,slot*.65),col=r.close>=r.open?'#64dcb4':'#f47e89';
@@ -174,7 +215,7 @@ function render(){
     .forEach((n,i)=>values[i].textContent=show(n)+(i===5&&Number.isFinite(n)?' '+pair.split('/')[0]:''));
   const frag=document.createDocumentFragment();
   for(const r of trades.slice(0,14)){
-    const tr=document.createElement('tr');
+    const tr=document.createElement('tr');tr.dataset.trade=String(r.trade_id);
     for(const [i,s] of [paris.format(new Date(r.timestamp)),show(r.price,priceFmt),show(r.qty,qtyFmt)].entries()){
       const td=document.createElement('td');td.textContent=s;
       if(i===1)td.className=r.side==='buy'?'up':'down';tr.append(td);
@@ -197,5 +238,184 @@ function closeView(){parent.postMessage('spectre:close-market',location.origin)}
 $('exit').onclick=closeView;
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeView()}});
 window.addEventListener('pagehide',()=>{active=false;disconnect();clearInterval(refresh);clearInterval(watch);observer.disconnect()});
+
+const fullNames={BTC:'bitcoin',ETH:'ether',SOL:'solana'};
+const markets=[
+ ['CRYPTO','Crypto · Kraken','', 'Transactions au comptant sur Kraken.'],
+ ['FRANCE','CAC 40','EURONEXT:PX1','Indice de grandes sociétés cotées à Paris. Sa valeur se lit en points.'],
+ ['FRANCE','TotalEnergies','EURONEXT:TTE','Action de TotalEnergies à Paris. Le prix correspond à une action, en euros.'],
+ ['ÉTATS-UNIS','S&P 500 · fonds SPY','AMEX:SPY','SPY est un fonds coté qui suit le S&P 500. Le prix affiché est celui d’une part, en dollars.'],
+ ['ÉTATS-UNIS','Apple','NASDAQ:AAPL','Action Apple cotée au Nasdaq. Son prix se lit en dollars par action.'],
+ ['MATIÈRES PREMIÈRES','Pétrole Brent','TVC:UKOIL','Indicateur du prix du Brent, exprimé en dollars par baril. La source et le contrat de référence comptent quand on compare deux cours.'],
+ ['MATIÈRES PREMIÈRES','Or','TVC:GOLD','Référence de prix de l’or en dollars par once troy. Une once troy représente environ 31,10 grammes.'],
+ ['SECTEURS','Énergie américaine · XLE','AMEX:XLE','Une part du fonds XLE donne une exposition à des sociétés américaines du secteur énergétique. Le fonds se cote en dollars.'],
+ ['SECTEURS','Lithium et batteries · LIT','AMEX:LIT','LIT regroupe des entreprises de la chaîne du lithium et des batteries. La valeur affichée est le prix en dollars d’une part du fonds.']
+];
+const picker=$('market-select'),external=$('global-market'),crypto=$('crypto-market');
+const groups=new Map();
+markets.forEach(([group,name],i)=>{
+  if(!groups.has(group)){
+    const tag=document.createElement('optgroup');tag.label=group;picker.append(tag);groups.set(group,tag);
+  }
+  groups.get(group).append(new Option(name,i));
+});
+const titleBar=document.querySelector('header small');
+let currentMarket=0;
+function showMarket(index){
+  clearHolo();
+  currentMarket=index;
+  const [,name,code,detail]=markets[index];
+  $('global-widget').replaceChildren();
+  crypto.hidden=!!code;external.hidden=!code;
+  titleBar.textContent=code?'COTATIONS / TRADINGVIEW':'KRAKEN · SPOT';
+  if(!code){active=true;selectPair(pair);return}
+  active=false;disconnect();
+  $('global-heading').textContent=name+'  /  '+code;
+  $('global-detail').textContent=detail;
+  const link='https://www.tradingview.com/symbols/'+code.replace(':','-')+'/';
+  $('global-source').href=link;
+  const wrap=document.createElement('div');wrap.className='tradingview-widget-container';
+  wrap.style.height='100%';
+  const slot=document.createElement('div');slot.className='tradingview-widget-container__widget';
+  const js=document.createElement('script');
+  js.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  js.async=true;
+  js.textContent=JSON.stringify({autosize:true,symbol:code,interval:'60',timezone:'Europe/Paris',
+    theme:'dark',style:'1',locale:'fr',allow_symbol_change:false,hide_side_toolbar:true,
+    withdateranges:true,calendar:false,save_image:false,backgroundColor:'#0e171e'});
+  js.onerror=()=>{slot.textContent='Lecteur indisponible. Ouvre la fiche de l’instrument ci-dessous.'};
+  wrap.append(slot,js);$('global-widget').append(wrap);
+}
+picker.onchange=()=>showMarket(Number(picker.value));
+
+const tip=$('market-holo'),cross=$('market-cross');
+let previousTarget=null,previousKey='';
+function clearHolo(){
+  tip.hidden=true;cross.hidden=true;previousTarget=null;previousKey='';
+}
+function placeTip(x,y){
+  const width=tip.offsetWidth,height=tip.offsetHeight;
+  tip.style.left=Math.max(6,Math.min(innerWidth-width-6,
+    x+width+20<innerWidth?x+15:x-width-15))+'px';
+  tip.style.top=Math.max(6,Math.min(innerHeight-height-6,
+    y+height+20<innerHeight?y+15:y-height-15))+'px';
+}
+function explain(target,key,title,body,x,y){
+  if(previousTarget!==target||previousKey!==key||tip.hidden){
+    previousTarget=target;previousKey=key;
+    tip.querySelector('strong').textContent=title;
+    tip.querySelector('p').textContent=body;
+    tip.hidden=false;
+  }
+  placeTip(x,y);
+}
+const dollars=n=>Number.isFinite(n)?show(n,priceFmt)+' USD':'indisponible';
+function tradeSummary(base){
+  if(!trades.length)return 'En attente des premières transactions Kraken.';
+  const sample=trades.slice(0,14);
+  const qty=sample.reduce((s,r)=>s+r.qty,0);
+  const turnover=sample.reduce((s,r)=>s+r.qty*r.price,0);
+  const buys=sample.filter(r=>r.side==='buy').length;
+  const first=paris.format(new Date(sample[sample.length-1].timestamp));
+  const last=paris.format(new Date(sample[0].timestamp));
+  return `De ${first} à ${last} (Paris), les ${sample.length} échanges affichés totalisent ${show(qty,qtyFmt)} ${base}.
+Prix moyen pondéré par les quantités : ${dollars(turnover/qty)}.
+${buys} échange(s) initié(s) côté achat, ${sample.length-buys} côté vente.`;
+}
+function chartHolo(e){
+  if(!hoverPlot){clearHolo();return}
+  const rect=$('chart').getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const {list,begin,slot,left,right,bottom,volBottom,height}=hoverPlot;
+  if(mx<left||mx>=right||my<12||my>volBottom){clearHolo();return}
+  const ts=begin+Math.floor((mx-left)/slot)*60000;
+  const item=list.find(([t])=>t===ts);
+  if(!item){clearHolo();return}
+  const r=item[1],base=pair.split('/')[0],volume=my>bottom;
+  const maxVolume=Math.max(...list.map(([,bar])=>bar.volume),1e-12);
+  if(volume && my<volBottom-r.volume/maxVolume*height*.14){clearHolo();return}
+  const time=paris.format(new Date(ts)).slice(0,5);
+  const direction=r.close>r.open?'Hausse':r.close<r.open?'Baisse':'Prix inchangé';
+  const body=volume?
+    `${show(r.volume,qtyFmt)} ${base} échangés pendant cette minute. La hauteur mesure la quantité totale. La couleur suit le sens de la bougie, tous achats et ventes confondus.`:
+    `${direction} entre le premier et le dernier échange de la minute.
+Ouverture : ${dollars(r.open)}
+Plus haut : ${dollars(r.high)}
+Plus bas : ${dollars(r.low)}
+Dernier prix de la minute : ${dollars(r.close)}
+Les mèches indiquent les deux extrêmes.`;
+  explain($('chart'),ts+'-'+volume,volume?'Volume · '+time:'Bougie 1 min · '+time,body,e.clientX,e.clientY);
+  cross.hidden=false;cross.style.left=(left+(Math.floor((mx-left)/slot)+.5)*slot)+'px';
+}
+function inspect(e){
+  const el=e.target;
+  if(el===$('chart')){chartHolo(e);return}
+  cross.hidden=true;
+  const hit=el.closest('#pairs button,#symbol,#price,#change,.hero .muted,.metric,aside .panelhead,td,th,#age,#link,#global-heading,#global-detail,#global-delay,#market-select,section .panelhead');
+  if(!hit){clearHolo();return}
+  if(previousTarget===hit&&!tip.hidden){placeTip(e.clientX,e.clientY);return}
+  const base=pair.split('/')[0],asset=fullNames[base];
+  const lastPrice=trades[0]?.price??ticker.last;
+  let title='',body='';
+  if(hit.matches('#pairs button,#symbol')){
+    const b=hit.textContent.trim().split('/')[0];
+    title=b+' / USD';body=`${b} désigne ${fullNames[b]}. USD est le dollar américain. Cette paire donne le nombre de dollars pour une unité de ${fullNames[b]}.`;
+  }else if(hit.matches('#price,.hero .muted')){
+    title='Dernier prix exécuté';
+    body=`${dollars(lastPrice)} pour 1 ${base} sur Kraken. C’est le prix du dernier échange reçu. La transaction peut porter sur une fraction de ${asset}.`;
+  }else if(hit.id==='change'){
+    title='Variation sur 24 heures';
+    body=Number.isFinite(ticker.change_pct)?
+      `Le cours ${ticker.change_pct<0?'a baissé de':ticker.change_pct>0?'a monté de':'a varié de'} ${show(Math.abs(ticker.change_pct))} % par rapport au début de la fenêtre glissante de 24 h de Kraken.`:
+      'En attente de la variation publiée par Kraken.';
+  }else if(hit.classList.contains('metric')){
+    const i=[...$('stats').children].indexOf(hit);
+    title=labels[i];
+    body=[
+      `Le meilleur acheteur propose ${dollars(ticker.bid)} pour 1 ${base}. C’est le prix d’achat le plus élevé actuellement affiché dans le carnet.`,
+      `Le vendeur le moins cher demande ${dollars(ticker.ask)} pour 1 ${base}. C’est la meilleure offre de vente affichée.`,
+      `Meilleure vente moins meilleur achat : ${dollars(ticker.ask)} − ${dollars(ticker.bid)}. L’écart entre les deux vaut ${dollars(ticker.ask-ticker.bid)} par ${base}.`,
+      `Sur les dernières 24 h, le prix le plus élevé auquel un ${base} s’est échangé sur Kraken est ${dollars(ticker.high)}.`,
+      `Sur les dernières 24 h, le prix le plus bas auquel un ${base} s’est échangé sur Kraken est ${dollars(ticker.low)}.`,
+      `Au total, ${show(ticker.volume,qtyFmt)} ${base} ont changé de mains sur cette paire au cours des dernières 24 h. Le volume se mesure ici en ${base}.`
+    ][i];
+  }else if(hit.matches('aside .panelhead')){
+    title='Transactions · instantané au survol';body=tradeSummary(base);
+  }else if(hit.matches('td')){
+    const id=hit.parentElement.dataset.trade;
+    const r=trades.find(t=>String(t.trade_id)===id);
+    if(!r){clearHolo();return}
+    title='Transaction Kraken · '+id;
+    body=`À ${paris.format(new Date(r.timestamp))}, ${show(r.qty,qtyFmt)} ${base} ont été échangés à ${dollars(r.price)} l’unité.
+Valeur de l’échange : ${dollars(r.qty*r.price)}.
+L’ordre qui a déclenché l’échange venait du côté ${r.side==='buy'?'acheteur':'vendeur'}.`;
+  }else if(hit.matches('th')){
+    title=hit.textContent;
+    body=['Heure de la transaction sur Kraken, affichée dans le fuseau de Paris.',
+      `Prix payé pour une unité de ${base}, en dollars.`,
+      `Nombre de ${base} échangés lors de cette transaction.`][hit.cellIndex];
+  }else if(hit.id==='age'){
+    title='Fraîcheur du dernier prix';body='Temps écoulé depuis la dernière transaction, calculé avec son horodatage Kraken. Une seconde peut passer sans nouvel échange.';
+  }else if(hit.id==='link'){
+    title='État de la connexion';body=connected?'Kraken a confirmé les flux de transactions, de cotations et de bougies.':'Connexion en cours ou interrompue. Les derniers chiffres affichés peuvent dater.';
+  }else if(hit.id==='global-heading'||hit.id==='global-detail'){
+    title=markets[currentMarket][1];body=markets[currentMarket][3];
+  }else if(hit.id==='global-delay'){
+    title='Fraîcheur du cours';body='Le lecteur indique les données disponibles pour cet instrument. Une place peut être fermée ou diffuser des cours différés.';
+  }else if(hit.id==='market-select'){
+    title='Choisir un marché';body='Crypto ouvre le terminal Kraken. Les autres choix ouvrent le graphique de l’instrument et précisent ce que représente son prix.';
+  }else{
+    title='Lire le graphique';body='Chaque bougie regroupe une minute. Son corps relie ouverture et dernier prix. Les mèches montrent les extrêmes. Les barres du bas représentent le volume.';
+  }
+  explain(hit,'',title,body,e.clientX,e.clientY);
+}
+document.addEventListener('pointermove',inspect);
+document.addEventListener('pointerout',e=>{
+  if(!e.relatedTarget || (e.relatedTarget instanceof Element && e.relatedTarget.closest('#global-widget')))clearHolo();
+});
+window.addEventListener('blur',clearHolo);
+window.addEventListener('scroll',clearHolo,true);
+window.addEventListener('resize',clearHolo);
+document.addEventListener('click',clearHolo,true);
+
 selectPair(pair);
 </script></body></html>
