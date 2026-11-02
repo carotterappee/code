@@ -60,6 +60,46 @@ article b{display:block;font:600 12px ui-monospace,monospace;color:var(--gold);m
 }
 @media(prefers-reduced-motion:reduce){*,*::before{animation:none!important}}
 </style>
+
+<style id="patrimoine-pages">
+.brief{width:min(1280px,100%);padding-top:24px;padding-bottom:24px}
+.brief h2{font-size:clamp(32px,3.8vw,62px)}
+.brief .era{margin-bottom:8px}
+.deck-lead{max-width:76ch;color:#c7d1c9;margin:10px 0 20px}
+.years{display:flex;gap:7px;flex-wrap:wrap;margin:15px 0 22px}
+.years button{font:600 14px ui-monospace,monospace}
+.years button[aria-pressed=true]{background:var(--gold);color:#172019;border-color:var(--gold)}
+.phases,.meters,.estate{display:grid;gap:12px}
+.phases,.meters{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tile{padding:clamp(15px,2vw,25px);border:1px solid #46564b;border-radius:10px;
+ background:linear-gradient(145deg,#23352c,#14201b)}
+.tile h3{font-size:clamp(22px,2vw,32px);margin:8px 0 12px}
+.tile p{margin:7px 0;color:#d5ded7}
+.big{display:block;color:#f6e3bd;font:400 clamp(26px,3vw,46px)/1.2 Georgia,serif}
+.riskline{padding:12px 16px;border-left:3px solid var(--gold);background:#1c2a22;margin:16px 0 0}
+.brief details{margin:10px 0;border-bottom:1px solid var(--line);padding:6px 0}
+.brief summary{cursor:pointer;color:#edd6ab;font-weight:600}
+.brief details p{margin:8px 0}
+.brief a{color:#c8dfcf}
+.estate{grid-template-columns:minmax(220px,.85fr) minmax(300px,1.5fr);align-items:center}
+.ring{width:min(205px,65vw);aspect-ratio:1;margin:10px auto 16px;border-radius:50%;
+ background:conic-gradient(#dcbc81 0 80.76923%,#718c80 80.76923% 100%);
+ display:grid;place-items:center}
+.ring span{width:73%;height:73%;background:#17231d;border-radius:50%;
+ display:grid;align-content:center;text-align:center;color:#eed8ac;font:30px Georgia,serif}
+.ring small{font:12px system-ui;color:#c4d2c7}
+.legend{text-align:center;color:#d4ded6;font-size:14px}
+.ledger{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.ledger th,.ledger td{text-align:left;padding:9px 5px;border-bottom:1px solid var(--line)}
+.ledger th{font-weight:500;color:#dfc999}.ledger td:last-child{text-align:right}
+@media(max-width:740px){.phases,.meters,.estate{grid-template-columns:1fr}.brief{padding-top:18px}}
+@media(prefers-reduced-motion:no-preference){
+ .brief:not([hidden]) .tile{animation:rise .45s ease both}
+ .brief:not([hidden]) .tile:nth-child(2){animation-delay:.08s}
+ .brief:not([hidden]) .tile:nth-child(3){animation-delay:.16s}
+}
+</style>
+
 </head>
 <body>
 <main>
@@ -84,21 +124,78 @@ article b{display:block;font:600 12px ui-monospace,monospace;color:var(--gold);m
 </section>
 
 <section class="slide" hidden aria-labelledby="title2">
-  <span class="era">Repères historiques · 2000 / 2008</span>
-  <h2 id="title2" class="rise">L’horloge des crises</h2>
-  <div class="track">
-    <article><span class="num">01 · Fragilité</span><h3>La promesse se fissure</h3>
-      <p><b>2000 · INTERNET</b>Les valorisations de nombreuses sociétés technologiques reposent sur des bénéfices encore lointains. Quand les attentes se retournent, les cours décrochent.</p>
-      <p><b>2007–2008 · IMMOBILIER</b>Aux États-Unis, les défauts de remboursement fragilisent les titres adossés aux prêts immobiliers à risque.</p></article>
-    <article><span class="num">02 · Transmission</span><h3>Qui doit vendre&nbsp;?</h3>
-      <p><b>2000 · LE FINANCEMENT SE TARIT</b>Une entreprise Internet qui dépense plus qu’elle ne gagne dépend de sa prochaine levée de fonds. Si elle échoue, sa trésorerie s’épuise.</p>
-      <p><b>2008 · LES VENTES FORCÉES</b>Un fonds endetté qui reçoit un appel de marge doit trouver du cash. Il peut vendre ses titres les plus liquides, même si les entreprises concernées restent solides.</p></article>
-    <article><span class="num">03 · Après le choc</span><h3>Du temps pour choisir</h3>
-      <p><b>APRÈS 2000</b>Le rebond des survivants ne répare pas les pertes des actionnaires des sociétés disparues. La capacité à financer l’activité devient décisive.</p>
-      <p><b>2008–2009</b>La Fed abaisse ses taux et engage des achats de titres pour soutenir le crédit. Le financement et les prix des actifs se rétablissent à des rythmes différents.</p></article>
-  </div>
-  <p class="take">« Une réserve de liquidités donne du temps pour choisir, au moment où d’autres doivent vendre. »</p>
-</section>
+<div class="brief">
+<span class="era">01 / Histoire financière</span>
+<h2 id="title2">L’horloge des crises</h2>
+<p class="deck-lead">Un choc révèle une fragilité. Les ventes ou le retrait du crédit amplifient les pertes. La stabilisation commence lorsque le mécanisme qui entretient la crise s’affaiblit.</p>
+<div class="years" aria-label="Comparer les crises">
+<button type="button" data-year="1929" aria-pressed="true">1929</button>
+<button type="button" data-year="1973" aria-pressed="false">1973</button>
+<button type="button" data-year="2000" aria-pressed="false">2000</button>
+<button type="button" data-year="2008" aria-pressed="false">2008</button>
+<button type="button" data-year="2020" aria-pressed="false">2020</button>
+</div>
+<div class="phases" aria-live="polite">
+<div class="tile"><span class="num">I · Déclencheur</span><h3 id="phase-a"></h3><p id="phase-at"></p></div>
+<div class="tile"><span class="num">II · Panique</span><h3 id="phase-b"></h3><p id="phase-bt"></p></div>
+<div class="tile"><span class="num">III · Stabilisation</span><h3 id="phase-c"></h3><p id="phase-ct"></p></div>
+</div>
+<p class="riskline"><strong>Le repère familial.</strong> Une réserve de liquidités réduit le risque de devoir vendre pendant la panique. Une chute simultanée des actifs, à elle seule, ne permet pas de dater le point bas.</p>
+</div></section>
+
+<section class="slide" hidden aria-labelledby="title3"><div class="brief">
+<span class="era">02 / Tableau de bord · Situation connue au 2 novembre 2026</span>
+<h2 id="title3">France · Le coût du refinancement</h2>
+<p class="deck-lead">Le risque budgétaire se matérialise au fil des échéances. Quand une ancienne obligation est remboursée et remplacée par une émission plus chère, la charge d’intérêts augmente progressivement.</p>
+<div class="meters">
+<div class="tile"><span class="num">Dette publique brute</span><strong class="big">3 595,5 Md€</strong><p>119,0 % du PIB à la fin du deuxième trimestre 2026. Ensemble des administrations publiques.</p></div>
+<div class="tile"><span class="num">Taux français à dix ans</span><strong class="big">4,93 %</strong><p>Référence TEC 10 au 30 octobre. L’écart avec l’Allemagne est de l’ordre de 1,6 point, soit environ 160 points de base selon l’heure de relevé.</p></div>
+<div class="tile"><span class="num">Intérêts de l’État</span><strong class="big">+10,3 Md€</strong><p>De 62,6 Md€ prévus en 2026 à 72,9 Md€ dans le projet 2027. Éducation nationale en 2027, pensions comprises : 89,1 Md€ de crédits de paiement proposés.</p></div>
+</div>
+<details><summary>Notation souveraine · quatre agences, trois perspectives négatives</summary>
+<p><strong>Fitch</strong> A+, négative (30 octobre) · <strong>Moody’s</strong> Aa3, négative (23 octobre) · <strong>DBRS</strong> AA, négative (18 septembre) · <strong>S&amp;P</strong> A+, stable (29 mai).</p>
+<p>Une perspective négative signale un risque de baisse ultérieure. Moody’s a maintenu sa note en octobre.</p></details>
+<details><summary>Fiscalité · sociétés, holdings patrimoniales et revente en LMNP</summary>
+<p><strong>Grandes entreprises.</strong> Le taux normal d’IS est de 25 %. La contribution exceptionnelle prorogée vise les très grandes entreprises. Pour le second exercice concerné, seuil de chiffre d’affaires de 1,5 Md€ ; taux de contribution de 20,6 % ou 41,2 % selon le chiffre d’affaires, avec lissage. Ces taux s’appliquent à la moyenne de l’IS de référence de deux exercices.</p>
+<p><strong>Holdings patrimoniales.</strong> Pour les exercices clos à partir du 31 décembre 2026, taxe de 20 % sur certains actifs non professionnels énumérés par la loi. Conditions cumulatives notamment : au moins 5 M€ d’actifs, contrôle individuel ou familial au sens du texte, et plus de 50 % de revenus passifs. La trésorerie ordinaire ne devient pas intégralement taxable du seul fait de sa détention en holding.</p>
+<p><strong>Studios LMNP au réel.</strong> Pour les ventes depuis le 15 février 2025, les amortissements admis en déduction réduisent en principe le prix d’acquisition retenu pour la plus-value. Exemple simplifié : 30 000 € d’amortissements concernés augmentent la plus-value brute de 30 000 €, avant abattements et sauf exception légale.</p></details>
+<details><summary>Sources et dates des indicateurs</summary><p>
+<a target="_blank" rel="noopener" href="https://www.insee.fr/fr/statistiques/9053525">Insee · dette T2</a> ·
+<a target="_blank" rel="noopener" href="https://www.banque-france.fr/fr/statistiques/taux-et-cours/indices-obligataires-2026-10-30">Banque de France · TEC 10</a> ·
+<a target="_blank" rel="noopener" href="https://www.ideal-investisseur.fr/marches/spread-oat-bund.html">Relevés OAT–Bund</a> ·
+<a target="_blank" rel="noopener" href="https://www.aft.gouv.fr/fr/budget-etat">AFT · charge de la dette</a> ·
+<a target="_blank" rel="noopener" href="https://www.assemblee-nationale.fr/dyn/opendata/PRJLANR5L17B3210.html">PLF 2027 · crédits proposés</a> ·
+<a target="_blank" rel="noopener" href="https://www.aft.gouv.fr/fr/calendrier-notations-france">AFT · notations</a> ·
+<a target="_blank" rel="noopener" href="https://bofip.impots.gouv.fr/bofip/15092-PGP.html/ACTU-2026-00097">BOFiP · contribution exceptionnelle</a> ·
+<a target="_blank" rel="noopener" href="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006308936">CGI · art. 235 ter C</a> ·
+<a target="_blank" rel="noopener" href="https://www.impots.gouv.fr/particulier/questions/je-vends-un-bien-immobilier-donne-en-location-meublee-comment-se-calcule-la">DGFiP · plus-value LMNP</a>.
+</p></details>
+</div></section>
+
+<section class="slide" hidden aria-labelledby="title4"><div class="brief">
+<span class="era">03 / Patrimoine familial · Paris</span>
+<h2 id="title4">Notre socle immobilier</h2>
+<p class="deck-lead">Une résidence principale détenue à quatre et trois studios meublés en LMNP. Les montants représentent la totalité des biens décrits, avant répartition entre propriétaires.</p>
+<div class="estate">
+<div class="tile"><div class="ring" role="img" aria-label="Sur 1 950 000 euros de valeur brute, 80,8 % de valeur nette et 19,2 % de dette">
+<span>1,95 M€<small>valeur brute estimée</small></span></div>
+<div class="legend">Or · valeur nette <b>80,8 %</b><br>Vert · capital restant dû <b>19,2 %</b></div></div>
+<div>
+<table class="ledger"><thead><tr><th>Bien ou emprunt</th><th>Durée restante</th><th>Montant</th></tr></thead><tbody>
+<tr><td>Résidence principale · 4 détenteurs</td><td>Valeur estimée</td><td>1 200 000 €</td></tr>
+<tr><td>Trois studios meublés parisiens</td><td>Valeur cumulée</td><td>750 000 €</td></tr>
+<tr><td>Crédit · studio 1</td><td>≈ 4 ans</td><td>25 000 €</td></tr>
+<tr><td>Crédit · studio 2</td><td>≈ 16 ans</td><td>170 000 €</td></tr>
+<tr><td>Crédit · studio 3</td><td>≈ 21 ans</td><td>180 000 €</td></tr>
+<tr><td><strong>Total des crédits déclarés</strong></td><td></td><td><strong>375 000 €</strong></td></tr>
+</tbody></table>
+<p class="riskline"><strong>1 575 000 € nets</strong> sur le périmètre familial décrit. Les studios seuls représentent 375 000 € nets.</p></div>
+</div>
+<details><summary>IFI · pourquoi le seuil de 1,3 M€ s’apprécie séparément</summary>
+<p>Le seuil porte sur la valeur immobilière nette taxable de chaque foyer au 1er janvier. Il faut rattacher à chaque foyer ses droits sur la résidence et les studios, tenir compte d’un éventuel usufruit, puis vérifier les dettes déductibles. La résidence principale peut ouvrir droit à un abattement de 30 % sous conditions. La détention à quatre ne suffit pas à établir quatre parts égales.</p>
+<p><a target="_blank" rel="noopener" href="https://www.impots.gouv.fr/particulier/personnes-imposables-lifi">DGFiP · foyer IFI</a> ·
+<a target="_blank" rel="noopener" href="https://www.impots.gouv.fr/particulier/questions/comment-determiner-la-valeur-des-biens-que-je-declare-pour-le-calcul-de-limpot">DGFiP · valeur des droits immobiliers</a></p></details>
+</div></section>
 
 <footer><span class="meta" id="count" aria-live="polite"></span>
 <nav aria-label="Navigation des diapositives">
@@ -134,5 +231,41 @@ document.addEventListener('keydown', e => {
 });
 show(0);
 </script>
+
+<script id="patrimoine-crises">
+(() => {
+  const crises = {
+    1929: [
+      'Le crédit nourrit la spéculation', 'Aux États-Unis, des investisseurs achètent des actions à crédit. Le krach d’octobre frappe des portefeuilles déjà fragiles.',
+      'Du krach aux banques', 'Les appels de marge accélèrent les ventes. À partir de 1930, les paniques bancaires contractent le crédit et aggravent la dépression.',
+      'Rétablir la confiance', 'En 1933, la réouverture contrôlée des banques et les réformes bancaires ouvrent une phase de reprise. L’emploi met bien plus longtemps à se rétablir.'],
+    1973: [
+      'Le pétrole devient plus cher', 'L’embargo pétrolier intervient à l’automne, alors que le recul boursier a déjà commencé. Le choc renchérit brutalement l’énergie.',
+      'Les marges se resserrent', 'Les coûts montent, la consommation ralentit et les bénéfices sont revus en baisse. Inflation et récession peuvent coexister.',
+      'L’activité repart par étapes', 'La levée de l’embargo en 1974 atténue le choc. La reprise économique s’amorce en 1975, tandis que l’inflation persiste.'],
+    2000: [
+      'Les promesses déçoivent', 'Les valorisations technologiques supposent des profits futurs considérables. Les investisseurs commencent à revoir ces hypothèses.',
+      'Les financements se ferment', 'Les cours chutent. Une entreprise Internet déficitaire qui comptait sur sa prochaine levée de fonds peut manquer de trésorerie.',
+      'Les entreprises se départagent', 'Faillites, restructurations et retour progressif aux bénéfices distinguent les survivants. Le Nasdaq touche son point bas en 2002.'],
+    2008: [
+      'Les prêts immobiliers se dégradent', 'La baisse de l’immobilier américain et les défauts sur les crédits fragiles font perdre de la valeur aux titres qui les financent.',
+      'Le crédit se grippe', 'Après la faillite de Lehman Brothers, la défiance entre prêteurs s’aggrave. Les acteurs endettés cherchent du cash et vendent ce qu’ils peuvent.',
+      'Le financement se rétablit', 'Garanties, recapitalisations et interventions des banques centrales soutiennent les circuits de crédit. Le redressement de l’économie prend davantage de temps.'],
+    2020: [
+      'Une pandémie interrompt l’activité', 'Les restrictions sanitaires et l’incertitude sur les recettes provoquent un choc économique extérieur au système financier.',
+      'La ruée vers le cash', 'En mars, les besoins de liquidités s’étendent à de nombreux marchés. Même des titres habituellement faciles à vendre subissent des tensions.',
+      'Deux reprises distinctes', 'Les interventions publiques stabilisent le financement. Les marchés rebondissent avant la réouverture complète de l’économie.']
+  };
+  const ids = ['phase-a','phase-at','phase-b','phase-bt','phase-c','phase-ct'];
+  const buttons = [...document.querySelectorAll('[data-year]')];
+  function select(year) {
+    ids.forEach((id,i) => document.getElementById(id).textContent = crises[year][i]);
+    buttons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.year === year)));
+  }
+  buttons.forEach(b => b.addEventListener('click', () => select(b.dataset.year)));
+  select('1929');
+})();
+</script>
+
 </body>
 </html>
