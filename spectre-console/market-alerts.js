@@ -91,17 +91,27 @@ window.MarketAlerts = (() => {
   }
 
   async function poll(id) {
-    const events=[], missing=[];
+    const events=[];
+    const statuses = new Map();
     await Promise.all(Object.entries(rules).map(async ([symbol,r])=>{
       try {
         const entry=peakFor(symbol);
         const d=await get(symbol);
         if(id!==generation || !enabled) return;
         // Évite une sonnerie sur la clôture de la veille ou du week-end.
-        if(!(d.price>0) || !Number.isFinite(d.time) ||
-           Math.abs(Date.now()-d.time)>30*60000) {
-          missing.push(r.name+' · cours ancien ou absent'); return;
+        if (!(d.price > 0) || !Number.isFinite(d.time) || d.time <= 0) {
+          statuses.set(symbol, 'cours ou heure indisponible');
+          return;
         }
+        if (Math.abs(Date.now() - d.time) > 30 * 60000) {
+          const when = new Date(d.time).toLocaleString('fr-FR', {
+            timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+          });
+          statuses.set(symbol, 'en attente · dernier cours le ' + when + ' (Paris)');
+          return;
+        }
+        statuses.set(symbol, 'surveillance active');
         const p=d.price;
         entry.observed=Math.max(entry.observed,p,Number.isFinite(d.high)?d.high:0);
         const [lo,hi]=r.price;
@@ -111,12 +121,12 @@ window.MarketAlerts = (() => {
         if(entry.pending) await entry.pending;
         if(id!==generation || !enabled) return;
         const top=high(entry);
-        if(!top) { missing.push(r.name+' · sommet indisponible'); return; }
+        if(!top) { statuses.set(symbol, 'prix surveillé · sommet indisponible'); return; }
         const drop=100*(top-p)/top;
         const [min,max]=r.drop;
         check(symbol+'-baisse',drop>=min-1e-9 && drop<=max+1e-9,
           r.name+' · baisse de '+fmt(drop)+' % depuis le sommet',events);
-      } catch { missing.push(r.name+' · source indisponible'); }
+      } catch { statuses.set(symbol, 'source indisponible'); }
     }));
     if(id!==generation || !enabled) return;
     const log=document.getElementById('alerts-log');
@@ -125,7 +135,9 @@ window.MarketAlerts = (() => {
       log.textContent=new Date().toLocaleTimeString('fr-FR')+' · '+events.join(' | ');
     }
     document.getElementById('alerts-status').textContent=
-      missing.length?missing.join(' · '):'Surveillance des trois actions active';
+      Object.entries(rules).map(([key, rule]) =>
+        rule.name + ' : ' + (statuses.get(key) || 'en attente')
+      ).join('  |  ');
     timer=setTimeout(()=>poll(id),30000);
   }
 
