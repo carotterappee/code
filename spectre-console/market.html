@@ -740,6 +740,11 @@ function openSovereign(visit){
 }
 
 function showMarket(index){
+  picker.value = String(index);
+  for (const button of stockShortcuts) {
+    button.hidden = index === 0;
+    button.setAttribute('aria-pressed', String(+button.value === index));
+  }
   if(index) SpectreLab.market(index===sovereignIndex ? null : exchangeInstruments[markets[index][2]][0]);
   const visit=++sovereignVisit;
   if(index===sovereignIndex){openSovereign(visit);return}
@@ -1205,6 +1210,22 @@ document.addEventListener('keydown',e=>{
   }
 },true);
 
-SpectreLab.mount();
-selectPair(pair);
+// Passer à true pour réactiver le sélecteur de périodes.
+const historyEnabled = false;
+if (historyEnabled) SpectreLab.mount();
+else $('range-tools').hidden = true;
+
+const stockShortcuts = ['EURONEXT:AI','EURONEXT:MC','NASDAQ:MSFT'].map(key => {
+  const index = markets.findIndex(m => m[2] === key);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.value = String(index);
+  button.textContent = markets[index][1];
+  button.title = markets[index][3];
+  button.onclick = () => showMarket(index);
+  $('pairs').insertBefore(button, $('link'));
+  return button;
+});
+
+showMarket(Number(stockShortcuts[0].value));
 </script></body></html>
