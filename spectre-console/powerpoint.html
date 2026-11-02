@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SPECTRE · Capital familial 2026–2035</title>
+<style>
+:root{color-scheme:dark;--ink:#f5eee0;--gold:#ddbc81;--muted:#b1bcb8;
+  --line:#39423e;--bg:#101816}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+main{min-height:100dvh;display:grid;grid-template-rows:auto 1fr auto;
+  background:radial-gradient(ellipse at 87% 36%,#283a30 0,transparent 53%)}
+header,footer{margin:0 clamp(18px,5vw,90px);padding:16px 0;display:flex;
+  align-items:center;justify-content:space-between;gap:14px}
+header{border-bottom:1px solid var(--line)}footer{border-top:1px solid var(--line)}
+.meta,.era,.num{font:600 12px/1.5 ui-monospace,Consolas,monospace;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--gold)}
+button{border:1px solid #647168;color:var(--ink);background:#17231e;border-radius:30px;
+  padding:8px 15px;font:inherit;cursor:pointer}
+button:hover,button:focus-visible{border-color:var(--gold);background:#304036}
+button:disabled{opacity:.3;cursor:default}
+nav{display:flex;gap:8px}
+.slide{margin:auto;width:min(1450px,100%);padding:clamp(24px,5vh,64px) clamp(20px,6vw,100px)}
+[hidden]{display:none!important}
+.cover{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(180px,.65fr);
+  gap:clamp(22px,5vw,80px);align-items:center}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:400;margin:0;line-height:1.06}
+h1{font-size:clamp(36px,5.35vw,94px);letter-spacing:-.048em;max-width:19ch}
+h2{font-size:clamp(36px,4.3vw,74px);letter-spacing:-.045em}
+h3{font-size:clamp(23px,2.1vw,36px);margin:12px 0 22px}
+.subtitle{border-left:2px solid var(--gold);padding-left:18px;max-width:47ch;
+  font-size:clamp(17px,1.6vw,25px);color:#d2d9d1;margin:28px 0 0}
+.era{display:block;margin:0 0 19px}
+.clock{width:100%;max-width:350px;justify-self:center;overflow:visible}
+.clock circle,.clock path{fill:none;stroke:var(--gold)}
+.clock text{fill:var(--gold);font:11px ui-monospace,monospace;letter-spacing:.12em}
+.hand{transform-origin:100px 100px}
+.slide:not([hidden]) .hand{animation:sweep 1.35s cubic-bezier(.18,.72,.2,1) both}
+@keyframes sweep{from{transform:rotate(-105deg)}to{transform:rotate(0)}}
+.track{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:30px 0 20px;
+  border-top:1px solid #8d805f}
+article{position:relative;padding:22px clamp(12px,1.5vw,25px) 8px 0}
+article+article{padding-left:clamp(12px,1.5vw,25px);border-left:1px solid var(--line)}
+article:before{content:"";position:absolute;top:-5px;width:9px;height:9px;
+  border-radius:50%;background:var(--gold);box-shadow:0 0 13px #daba8055}
+article p{color:#d4dcd5;font-size:clamp(15px,1.2vw,19px);margin:12px 0}
+article b{display:block;font:600 12px ui-monospace,monospace;color:var(--gold);margin-bottom:4px}
+.take{font:italic clamp(20px,2vw,31px)/1.35 Georgia,serif;margin:10px 0;color:var(--ink)}
+.slide:not([hidden]) .rise,.slide:not([hidden]) article{animation:rise .6s ease both}
+.slide:not([hidden]) article:nth-child(2){animation-delay:.12s}
+.slide:not([hidden]) article:nth-child(3){animation-delay:.24s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media(max-width:700px){
+ .cover{grid-template-columns:1fr}.clock{width:125px;justify-self:start}
+ .track{grid-template-columns:1fr;border:0;margin-top:20px}
+ article,article+article{padding:12px 0 10px 20px;border:0;border-left:1px solid #8d805f}
+ article:before{top:18px;left:-5px}h3{margin:4px 0 10px}
+ header,footer{padding:10px 0}
+}
+@media(prefers-reduced-motion:reduce){*,*::before{animation:none!important}}
+</style>
+</head>
+<body>
+<main>
+<header><span class="meta">Spectre / Dossier patrimonial</span>
+<button id="exit" aria-label="Quitter la présentation">Quitter ×</button></header>
+
+<section class="slide cover" aria-labelledby="title1">
+  <div class="rise">
+    <span class="era">Horizon familial · 2026–2035</span>
+    <h1 id="title1">Stratégie de préservation et de multiplication du capital familial <span style="color:var(--gold)">2026–2035</span></h1>
+    <p class="subtitle">Transformer le risque systémique français en opportunité patrimoniale internationale.</p>
+  </div>
+  <svg class="clock" viewBox="0 0 200 200" aria-hidden="true">
+    <circle cx="100" cy="100" r="91" opacity=".35"/>
+    <circle cx="100" cy="100" r="78" stroke-width="4" stroke-dasharray="1 7.168"/>
+    <circle cx="100" cy="100" r="64" opacity=".25"/>
+    <path d="M100 10v11 M190 100h-11 M100 190v-11 M10 100h11"/>
+    <g class="hand"><path d="M70 127L143 56" stroke-width="2"/>
+    <circle cx="100" cy="100" r="4" style="fill:var(--gold)"/></g>
+    <text x="100" y="151" text-anchor="middle">MMXXVI</text>
+  </svg>
+</section>
+
+<section class="slide" hidden aria-labelledby="title2">
+  <span class="era">Repères historiques · 2000 / 2008</span>
+  <h2 id="title2" class="rise">L’horloge des crises</h2>
+  <div class="track">
+    <article><span class="num">01 · Fragilité</span><h3>La promesse se fissure</h3>
+      <p><b>2000 · INTERNET</b>Les valorisations de nombreuses sociétés technologiques reposent sur des bénéfices encore lointains. Quand les attentes se retournent, les cours décrochent.</p>
+      <p><b>2007–2008 · IMMOBILIER</b>Aux États-Unis, les défauts de remboursement fragilisent les titres adossés aux prêts immobiliers à risque.</p></article>
+    <article><span class="num">02 · Transmission</span><h3>Qui doit vendre&nbsp;?</h3>
+      <p><b>2000 · LE FINANCEMENT SE TARIT</b>Une entreprise Internet qui dépense plus qu’elle ne gagne dépend de sa prochaine levée de fonds. Si elle échoue, sa trésorerie s’épuise.</p>
+      <p><b>2008 · LES VENTES FORCÉES</b>Un fonds endetté qui reçoit un appel de marge doit trouver du cash. Il peut vendre ses titres les plus liquides, même si les entreprises concernées restent solides.</p></article>
+    <article><span class="num">03 · Après le choc</span><h3>Du temps pour choisir</h3>
+      <p><b>APRÈS 2000</b>Le rebond des survivants ne répare pas les pertes des actionnaires des sociétés disparues. La capacité à financer l’activité devient décisive.</p>
+      <p><b>2008–2009</b>La Fed abaisse ses taux et engage des achats de titres pour soutenir le crédit. Le financement et les prix des actifs se rétablissent à des rythmes différents.</p></article>
+  </div>
+  <p class="take">« Une réserve de liquidités donne du temps pour choisir, au moment où d’autres doivent vendre. »</p>
+</section>
+
+<footer><span class="meta" id="count" aria-live="polite"></span>
+<nav aria-label="Navigation des diapositives">
+<button id="prev" aria-label="Diapositive précédente">←</button>
+<button id="next" aria-label="Diapositive suivante">→</button>
+</nav></footer>
+</main>
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const prev = document.getElementById('prev');
+const next = document.getElementById('next');
+let page = 0;
+function show(index) {
+  page = Math.max(0, Math.min(slides.length - 1, index));
+  slides.forEach((slide, i) => { slide.hidden = i !== page; });
+  prev.disabled = page === 0;
+  next.disabled = page === slides.length - 1;
+  document.getElementById('count').textContent =
+    String(page + 1).padStart(2,'0') + ' / ' + String(slides.length).padStart(2,'0');
+  window.scrollTo(0, 0);
+}
+function quit() {
+  parent.postMessage('spectre:close-market', location.origin);
+}
+prev.onclick = () => show(page - 1);
+next.onclick = () => show(page + 1);
+document.getElementById('exit').onclick = quit;
+document.addEventListener('keydown', e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); show(page + 1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); show(page - 1); }
+  if (e.key === 'Escape') { e.preventDefault(); quit(); }
+});
+show(0);
+</script>
+</body>
+</html>

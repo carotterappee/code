@@ -2081,12 +2081,14 @@ requestAnimationFrame(render);
     if (state !== 'clow-entry') return;
 
 
-    if (portInput.value.trim().toLowerCase() === 'market') {
+    const viewCommand = portInput.value.trim().toLowerCase();
+    if (viewCommand === 'market' || viewCommand === 'powerpoint') {
       port.hidden=true;
       state='market';
       const frame=document.getElementById('spectre-market');
       frame.hidden=false;
-      frame.src='./market.html';
+      frame.title = viewCommand === 'powerpoint' ? 'Présentation patrimoniale' : 'SPECTRE Market';
+      frame.src = viewCommand === 'powerpoint' ? './powerpoint.html' : './market.html';
       frame.focus();
       return;
     }
