@@ -100,6 +100,56 @@ article b{display:block;font:600 12px ui-monospace,monospace;color:var(--gold);m
 }
 </style>
 
+
+<style>
+.planpage{max-width:1280px;margin:auto}
+.planpage h2{font-size:clamp(32px,3.8vw,64px)}
+.planpage .deck-lead{margin:10px 0 18px}
+.flowgrid,.equitygrid,.zonesgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.flowstep,.equitycard,.zonecard,.vaultbody{
+  background:linear-gradient(140deg,#213129,#141e19);
+  border:1px solid #48574c;border-radius:12px;padding:clamp(16px,2vw,26px)}
+.flowstep{position:relative}
+.flowstep:not(:last-child)::after{content:'→';position:absolute;z-index:1;right:-19px;top:39%;
+  width:24px;color:#f0cf8b;background:#16201b;text-align:center;font-size:21px}
+.planpage h3{margin:8px 0 14px;font-size:clamp(22px,2vw,32px)}
+.planpage p{line-height:1.45}
+.planpage .number{display:block;font:normal clamp(27px,3vw,45px)/1.2 Georgia,serif;color:#f3d49b}
+.planpage .sub{color:#b9c9bc;font-size:.91em}
+.planpage details{padding:7px 0;margin-top:7px;border-bottom:1px solid #39483c}
+.planpage summary{cursor:pointer;color:#ead3a5}
+.planpage a{color:#cde4d5}
+.vaultlayout{display:grid;grid-template-columns:minmax(190px,.72fr) minmax(0,1.7fr);gap:20px}
+.vaultface{display:grid;place-content:center;text-align:center;gap:12px;
+  border:1px solid #766e4e;border-radius:15px;background:radial-gradient(ellipse,#304138,#141f19)}
+.vaultface svg{width:100px;margin:auto;stroke:#e2c289;fill:none;stroke-width:2}
+.vaultbody ul{margin:0;padding-left:19px}.vaultbody li+li{margin-top:10px}
+.equitycard .ticker,.zonecard .ticker{color:#d5bd90;font:600 12px ui-monospace,monospace;letter-spacing:.14em}
+.equitycard dl{margin:0}.equitycard dt{margin-top:14px;color:#e7cc96;font-weight:600}
+.equitycard dd{margin:3px 0;color:#d3ddd6}
+.zonegraph{height:53px;position:relative;margin:18px 3px 0}
+.zonegraph .axis{position:absolute;top:23px;left:0;right:0;height:2px;background:#67766d}
+.zonegraph .green{position:absolute;top:17px;height:14px;background:#58aa7c;border-radius:3px}
+.zonegraph .pin{position:absolute;top:9px;height:30px;width:3px;background:#ffda89}
+.zonegraph .pin::before{content:'';position:absolute;width:7px;height:7px;background:#ffda89;
+  border-radius:50%;left:-2px;top:-2px}
+.axislabels{display:flex;justify-content:space-between;margin-top:-10px;color:#b5c5b9;font-size:12px}
+.tranches{display:flex;height:6px;gap:3px;margin:14px 0 7px}
+.tranches i:first-child{width:30%;background:#e7c280}.tranches i:last-child{width:70%;background:#829987}
+.planpage .riskline{margin-top:16px}
+@media(prefers-reduced-motion:no-preference){
+ .slide:not([hidden]) .flowstep,.slide:not([hidden]) .zonecard,.slide:not([hidden]) .equitycard{
+ animation:rise .48s ease both}
+ .slide:not([hidden]) :is(.flowstep,.zonecard,.equitycard):nth-child(2){animation-delay:.09s}
+ .slide:not([hidden]) :is(.flowstep,.zonecard,.equitycard):nth-child(3){animation-delay:.18s}
+}
+@media(max-width:760px){
+ .flowgrid,.equitygrid,.zonesgrid,.vaultlayout{grid-template-columns:1fr}
+ .flowstep:not(:last-child)::after{content:'↓';right:24px;top:auto;bottom:-19px}
+ .vaultface{padding:15px}.vaultface svg{width:65px}
+}
+</style>
+
 </head>
 <body>
 <main>
@@ -197,6 +247,86 @@ article b{display:block;font:600 12px ui-monospace,monospace;color:var(--gold);m
 <a target="_blank" rel="noopener" href="https://www.impots.gouv.fr/particulier/questions/comment-determiner-la-valeur-des-biens-que-je-declare-pour-le-calcul-de-limpot">DGFiP · valeur des droits immobiliers</a></p></details>
 </div></section>
 
+
+<!-- SPECTRE patrimoine pages 5-8 -->
+<section class="slide" hidden aria-labelledby="title5"><div class="planpage">
+<span class="era">04 / Immobilier · scénario de refinancement</span>
+<h2 id="title5">La manœuvre finale</h2>
+<p class="deck-lead">Trois studios à Paris, un financement à renégocier et une question décisive : quelle trésorerie restera effectivement disponible, et pour qui ?</p>
+<div class="flowgrid">
+<div class="flowstep"><span class="num">01 / Studios → SARL de famille</span>
+<h3>Réunir les droits</h3><strong class="number">750 000 €</strong>
+<p>Valeur estimée des trois studios. Le projet prévoit une gérance familiale et une activité de location meublée au réel.</p>
+<p class="sub">Vérifier les titulaires des droits, notamment en cas de démembrement, les accords nécessaires, l’option à l’IR et le statut de chaque associé. La reprise des prêts suppose l’accord des prêteurs.</p></div>
+<div class="flowstep"><span class="num">02 / Banque privée</span>
+<h3>Refinancer les studios</h3><strong class="number">575 000 €</strong>
+<p>Prêt hypothécaire envisagé. Sur 750 000 € de garanties, le ratio prêt/valeur atteint <b>76,7 %</b>.</p>
+<p class="sub">La banque examine notamment les loyers nets et les échéances annuelles. Taux, durée, charges, vacance et garanties personnelles déterminent la faisabilité. Le taux d’endettement personnel annoncé de 65 % reste à examiner.</p></div>
+<div class="flowstep"><span class="num">03 / SARL → projet Luxembourg</span>
+<h3>Identifier le solde</h3><strong class="number">200 000 €</strong>
+<p>575 000 € empruntés moins 375 000 € pour solder les trois crédits. Le solde est brut de frais, d’indemnités et de coûts de transfert.</p>
+<p class="sub">Si la SARL emprunte, elle reçoit les fonds. Avant tout versement sur un contrat personnel au Luxembourg, il faut préciser le titulaire, le fondement du versement et sa fiscalité.</p></div>
+</div>
+<details><summary>Comment tester le scénario avant de signer ?</summary>
+<p><b>Couverture de la dette.</b> Diviser le revenu locatif net disponible par le service annuel du prêt, capital et intérêts compris. Sans loyers nets, taux et durée proposés, ce ratio reste à calculer.</p>
+<p><b>Résultat fiscal.</b> Les intérêts et charges admissibles entrent dans le calcul. L’amortissement déductible est plafonné. Un résultat imposable nul dépend des comptes réels. Le capital remboursé à la banque constitue une sortie de trésorerie.</p>
+<p><a target="_blank" rel="noopener" href="https://www.impots.gouv.fr/particulier/les-regimes-dimposition">DGFiP · location meublée au réel</a></p></details>
+</div></section>
+
+<section class="slide" hidden aria-labelledby="title6"><div class="planpage">
+<span class="era">05 / Luxembourg · enveloppe et protection</span>
+<h2 id="title6">Le coffre-fort international</h2>
+<p class="deck-lead">100 000 € de départ + jusqu’à 200 000 € issus du refinancement. L’objectif de 300 000 € suppose que les fonds puissent être réunis par le même titulaire après frais et fiscalité.</p>
+<div class="vaultlayout"><div class="vaultface">
+<svg viewBox="0 0 88 88" aria-hidden="true"><rect x="7" y="9" width="74" height="66" rx="8"/>
+<rect x="14" y="16" width="60" height="52" rx="5"/><circle cx="46" cy="42" r="14"/>
+<circle cx="46" cy="42" r="4"/><path d="M46 28v10m12 11-8-5m-16 5 8-5M18 76v5m52-5v5M14 29h7m-7 22h7"/></svg>
+<strong class="number">300 000 €</strong><span class="num">Objectif avant frais</span></div>
+<div class="vaultbody"><ul>
+<li><b>Fonds interne dédié.</b> Demander une proposition écrite précisant l’éligibilité du souscripteur, sa catégorie patrimoniale, les supports permis et les frais. Le passage de 250 000 € ne suffit pas à garantir l’ouverture d’un FID.</li>
+<li><b>Protection juridique.</b> Les créanciers d’assurance disposent d’un privilège sur les actifs représentatifs des engagements de l’assureur. La garantie bancaire usuelle de 100 000 € par déposant et établissement relève d’un autre mécanisme. Une faillite bancaire française ne rend pas automatiquement le contrat disponible.</li>
+<li><b>Réserve d’attente.</b> Dépôt en euros, fonds en euros, support monétaire et position en francs suisses ou dollars ont des risques et des délais de sortie différents. Une devise étrangère peut perdre de la valeur en euros.</li>
+<li><b>Fiscalité française.</b> Pour un particulier résident de France, un rachat comporte en principe une fraction de gains imposables. Vérifier les prélèvements sociaux selon le support et déclarer le contrat étranger. Une souscription par une société appelle une analyse distincte.</li>
+</ul></div></div>
+<p class="riskline"><strong>Option de crédit lombard.</strong> À 70 % de 300 000 €, la simulation donne 210 000 € de prêt et 510 000 € de capacité brute. La banque fixe les actifs éligibles, la quotité, le taux et les délais. Une baisse du nantissement peut provoquer un appel de garantie ou des ventes.</p>
+<details><summary>Textes de référence</summary><p>
+<a href="https://www.caa.lu/uploads/documents/files/LC26-1_FR.pdf" target="_blank" rel="noopener">CAA · règles d’investissement 2026</a> ·
+<a href="https://www.caa.lu/uploads/documents/files/Loi_SecteurAssurances_2015-12-07_coord_2025-02-14.pdf" target="_blank" rel="noopener">Loi luxembourgeoise · articles 117 à 119</a> ·
+<a href="https://www.impots.gouv.fr/formulaire/3916/declaration-par-un-resident-dun-compte-letranger-ou-dun-contrat-de-capitalisation-o" target="_blank" rel="noopener">DGFiP · déclaration du contrat étranger</a></p></details>
+</div></section>
+
+<section class="slide" hidden aria-labelledby="title7"><div class="planpage">
+<span class="era">06 / Actions · trois entreprises à suivre</span>
+<h2 id="title7">Trois entreprises, trois risques distincts</h2>
+<p class="deck-lead">La question commune : qu’est-ce qui soutient les bénéfices de l’entreprise, et quel événement pourrait invalider notre lecture ?</p>
+<div class="equitygrid">
+<div class="equitycard"><span class="ticker">MC · PARIS · EUR</span><h3>LVMH</h3>
+<dl><dt>Ce que l’on achète</dt><dd>Des maisons de luxe qui vendent dans le monde entier. Leurs marques peuvent soutenir les prix, avec des différences selon les produits et les clientèles.</dd>
+<dt>Ce qu’il faut surveiller</dt><dd>Demande en Chine et aux États-Unis, croissance organique, marges et effets de change. Une chute du cours peut aussi refléter une révision des bénéfices.</dd>
+<dt>Repère du scénario</dt><dd>385,50 € par action.</dd></dl></div>
+<div class="equitycard"><span class="ticker">AI · PARIS · EUR</span><h3>Air Liquide</h3>
+<dl><dt>Ce que l’on achète</dt><dd>Un grand fournisseur de gaz industriels et médicaux. Les contrats longs et les installations chez les clients apportent de la visibilité à certaines activités.</dd>
+<dt>Ce qu’il faut surveiller</dt><dd>Volumes industriels, énergie, investissements et dividende couvert par la trésorerie. Pour comparer les cours anciens, ajuster les séries des attributions d’actions gratuites.</dd>
+<dt>Repère du scénario</dt><dd>180,40 € par action.</dd></dl></div>
+<div class="equitycard"><span class="ticker">MSFT · NASDAQ · USD</span><h3>Microsoft</h3>
+<dl><dt>Ce que l’on achète</dt><dd>Des logiciels d’entreprise, Azure et des activités de jeu vidéo, dont Activision Blizzard. La détention introduit une exposition au dollar pour la famille.</dd>
+<dt>Ce qu’il faut surveiller</dt><dd>Rendement des investissements dans l’IA, croissance du cloud et valorisation. Même si le dollar monte, l’action peut perdre de la valeur en euros si son cours baisse davantage.</dd>
+<dt>Repère du scénario</dt><dd>521,91 $ par action.</dd></dl></div>
+</div><p class="riskline">Les trois prix sont ceux retenus pour cette simulation. Une baisse de cours, même prononcée, ne mesure pas à elle seule la valeur de l’entreprise.</p>
+</div></section>
+
+<section class="slide" hidden aria-labelledby="title8"><div class="planpage">
+<span class="era">07 / Plan d’exécution · hypothèses familiales</span>
+<h2 id="title8">À quels prix engager le capital ?</h2>
+<p class="deck-lead">Budget simulé de 300 000 €, hors crédit lombard. Chaque échelle est exprimée dans la devise de l’action. Le trait doré situe le prix de référence ; la bande verte marque la zone envisagée.</p>
+<div class="zonesgrid" id="buy-zones"></div>
+<p class="riskline"><strong>Règle 30 / 70.</strong> Au premier signal confirmé, engager 30 % de l’enveloppe de la ligne. Réserver 70 % à des achats successifs. Avant chaque tranche suivante, fixer un prix et réexaminer la thèse ; le seul mot « capitulation » ne définit pas un ordre exécutable.</p>
+<details><summary>Lire les montants et les limites du scénario</summary>
+<p>Les enveloppes représentent 50 % pour LVMH et 25 % pour chacune des deux autres lignes. Le premier passage des trois lignes en zone mobiliserait 90 000 € au total. Les tranches suivantes représenteraient 210 000 € provenant de la trésorerie initiale. Ce montant est distinct du crédit lombard hypothétique de la page 6.</p>
+<p>À 385,50 €, une première tranche LVMH de 45 000 € représente 116 actions entières avant frais. À prix inchangé, 150 000 € représentent 389 actions. Pour Microsoft, le nombre de titres dépend aussi du taux EUR/USD au moment de la conversion.</p>
+</details>
+</div></section>
+
 <footer><span class="meta" id="count" aria-live="polite"></span>
 <nav aria-label="Navigation des diapositives">
 <button id="prev" aria-label="Diapositive précédente">←</button>
@@ -264,6 +394,51 @@ show(0);
   }
   buttons.forEach(b => b.addEventListener('click', () => select(b.dataset.year)));
   select('1929');
+})();
+</script>
+
+
+<script id="spectre-buy-zones">
+(() => {
+  const rows = [
+    {name:'LVMH',unit:'€',ref:385.50,axis:[300,500],zone:[null,400],
+     label:'Sous 400 €',budget:'150 000 €',first:'45 000 €',later:'105 000 €',
+     note:'Le repère est dans la zone. Par rapport au repère haut de 858 € fourni pour la simulation, la baisse calculée est de 55,1 %.'},
+    {name:'Air Liquide',unit:'€',ref:180.40,axis:[110,195],zone:[125,132],
+     label:'125 à 132 €',budget:'75 000 €',first:'22 500 €',later:'52 500 €',
+     note:'Pour rejoindre la zone depuis 180,40 €, la baisse serait de 26,8 % à 30,7 %.'},
+    {name:'Microsoft',unit:'$',ref:521.91,axis:[240,560],zone:[270,290],
+     label:'270 à 290 $',budget:'75 000 €',first:'22 500 €',later:'52 500 €',
+     note:'Pour rejoindre la zone depuis 521,91 $, la baisse serait de 44,4 % à 48,3 %. Le scénario ne suppose aucune date de correction.'}
+  ];
+  const root=document.getElementById('buy-zones');
+  function make(tag,cls,value){
+    const el=document.createElement(tag);
+    if(cls) el.className=cls;
+    if(value!==undefined) el.textContent=value;
+    return el;
+  }
+  for(const row of rows){
+    const [a,b]=row.axis;
+    const pos=v=>100*(v-a)/(b-a);
+    const card=make('div','zonecard');
+    const graph=make('div','zonegraph');
+    graph.setAttribute('aria-hidden','true');
+    const band=make('div','green');
+    const left=pos(row.zone[0]??a);
+    band.style.left=left+'%';
+    band.style.width=(pos(row.zone[1])-left)+'%';
+    const pin=make('div','pin');pin.style.left=pos(row.ref)+'%';
+    graph.append(make('div','axis'),band,pin);
+    const labels=make('div','axislabels');
+    labels.append(make('span','',a+' '+row.unit),make('span','',b+' '+row.unit));
+    const split=make('div','tranches');split.append(make('i'),make('i'));
+    card.append(make('span','ticker',row.name),make('h3','',row.label),
+      make('div','sub','Repère : '+row.ref.toLocaleString('fr-FR',{minimumFractionDigits:2})+' '+row.unit),
+      graph,labels,make('p','',row.note),make('strong','',row.budget+' prévus'),
+      split,make('div','sub','30 % · '+row.first+' / 70 % · '+row.later));
+    root.append(card);
+  }
 })();
 </script>
 
