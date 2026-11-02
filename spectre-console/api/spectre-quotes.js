@@ -1,5 +1,5 @@
 
-const allowed=new Set(["^FCHI", "TTE.PA", "SPY", "AAPL", "BZ=F", "GC=F", "XLE", "LIT", "GFC.PA", "LI.PA", "NXI.PA", "ENGI.PA", "HO.PA", "AM.PA", "SAF.PA", "AC.PA", "DG.PA", "SGO.PA"]);
+const allowed=new Set(["^FCHI", "TTE.PA", "SPY", "AAPL", "BZ=F", "GC=F", "XLE", "LIT", "GFC.PA", "LI.PA", "NXI.PA", "ENGI.PA", "HO.PA", "AM.PA", "SAF.PA", "AC.PA", "DG.PA", "SGO.PA", "MC.PA", "AI.PA", "MSFT"]);
 
 module.exports=async function handler(req,res){
   if(req.method!=='GET')return res.status(405).end();

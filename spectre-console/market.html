@@ -197,9 +197,12 @@ footer{padding:10px 1px;font-size:11px;justify-content:space-between}
 .polit-result{padding:10px;margin:10px 0;background:#173330;border-left:2px solid #7de0b7;color:#d0f5e5}
 </style>
 
+<style id="spectre-analyste-en-pause">
+#la-open, #local-analyst { display: none !important; }
+</style>
 </head>
 <body>
-<header><strong>SPECTRE / MARKET</strong><small>KRAKEN · SPOT</small><button id="la-open" type="button">◇ ANALYSTE</button><button id="exit">← RETOUR</button></header>
+<header><strong>SPECTRE / MARKET</strong><small>KRAKEN · SPOT</small><button id="la-open" disabled type="button">◇ ANALYSTE</button><button id="exit">← RETOUR</button></header>
 <main>
 
 <div id="universe">
@@ -509,6 +512,9 @@ const markets=[
 ];
 const picker=$('market-select'),external=$('global-market'),crypto=$('crypto-market');
 
+markets.push(["France · Luxe", "LVMH", "EURONEXT:MC", "Groupe de luxe français. Le cours correspond à une action LVMH cotée à Paris."]);
+markets.push(["France · Industrie", "Air Liquide", "EURONEXT:AI", "Groupe spécialisé dans les gaz industriels et médicaux. Le cours correspond à une action cotée à Paris."]);
+markets.push(["ÉTATS-UNIS", "Microsoft", "NASDAQ:MSFT", "Groupe américain de logiciels et de services cloud. Le cours correspond à une action cotée au Nasdaq."]);
 const sovereignIndex=markets.length;
 markets.push(['FRANCE','Dette publique & taux à 10 ans','FR:SOV','Dette publique et rendements souverains français.']);
 const groups=new Map();
@@ -522,6 +528,9 @@ const titleBar=document.querySelector('header small');
 let currentMarket=0;
 
 const exchangeInstruments={
+  "NASDAQ:MSFT":["MSFT", "USD", "dollars par action", "actions"],
+  "EURONEXT:AI":["AI.PA", "EUR", "euros par action", "actions"],
+  "EURONEXT:MC":["MC.PA", "EUR", "euros par action", "actions"],
   "EURONEXT:GFC":["GFC.PA", "EUR", "euros par action", "actions"],
   "EURONEXT:LI":["LI.PA", "EUR", "euros par action", "actions"],
   "EURONEXT:NXI":["NXI.PA", "EUR", "euros par action", "actions"],
